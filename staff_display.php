@@ -287,8 +287,10 @@
 const REFRESH_MS = <?php echo (int)APP_REFRESH_MS; ?>;
 const thresholdYellow = <?php echo (int)(defined('ALERT_THRESHOLD_YELLOW_DEFAULT') ? ALERT_THRESHOLD_YELLOW_DEFAULT : 10); ?>;
 const thresholdRed = <?php echo (int)(defined('ALERT_THRESHOLD_RED_DEFAULT') ? ALERT_THRESHOLD_RED_DEFAULT : 20); ?>;
-const endpointActive = 'api_checker.php?action=list_active';
-const endpointFinished = 'api_checker.php?action=list_finished';
+const PAGE_CID = <?php echo (int)(isset($_GET['cid']) && (int)$_GET['cid'] > 0 ? (int)$_GET['cid'] : 0); ?>;
+const cidParam = PAGE_CID > 0 ? '&cid=' + PAGE_CID : '';
+const endpointActive = 'api_checker.php?action=list_active'   + cidParam;
+const endpointFinished = 'api_checker.php?action=list_finished' + cidParam;
 
 const state = {
     stats: { active_rows: 0, active_qty: 0, recent_finished_rows: 0 },

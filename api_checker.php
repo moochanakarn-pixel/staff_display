@@ -5,6 +5,16 @@ error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth_check.php';
 
+function getEffectiveComputerId()
+{
+    static $cid = null;
+    if ($cid === null) {
+        $requested = isset($_REQUEST['cid']) ? (int)$_REQUEST['cid'] : 0;
+        $cid = $requested > 0 ? $requested : (int)CURRENT_COMPUTER_ID;
+    }
+    return $cid;
+}
+
 function requestedMethod()
 {
     return isset($_SERVER['REQUEST_METHOD']) ? strtoupper((string)$_SERVER['REQUEST_METHOD']) : 'GET';
@@ -389,7 +399,7 @@ function buildFilterInfo($conn = null, $overridePrintServerUrl = '')
 {
     $displayPrinters = array();
     if ($conn instanceof mysqli) {
-        $displayPrinters = fetchAvailablePrinters($conn, (int)CURRENT_COMPUTER_ID);
+        $displayPrinters = fetchAvailablePrinters($conn, getEffectiveComputerId());
     }
     $normalizedPrintServerUrl = normalizePrintServerBaseUrl($overridePrintServerUrl);
     $checkoutPrinters = resolveCheckoutPrinterOptions($conn, $normalizedPrintServerUrl);
@@ -397,7 +407,7 @@ function buildFilterInfo($conn = null, $overridePrintServerUrl = '')
     return array(
         'active_today_only' => (bool)ACTIVE_ROWS_TODAY_ONLY,
         'finished_today_only' => (bool)FINISHED_ROWS_TODAY_ONLY,
-        'current_computer_id' => (int)CURRENT_COMPUTER_ID,
+        'current_computer_id' => getEffectiveComputerId(),
         'allowed_printer_ids' => array_values(array_map('intval', array_column($displayPrinters, 'printer_id'))),
         'available_printers' => $checkoutPrinters,
         'display_printers' => $displayPrinters,
@@ -417,7 +427,7 @@ function resolveCheckoutPrinterOptions($conn = null, $overridePrintServerUrl = '
     }
 
     if ($provider === 'queue' && $conn instanceof mysqli) {
-        return fetchAvailablePrinters($conn, (int)CURRENT_COMPUTER_ID);
+        return fetchAvailablePrinters($conn, getEffectiveComputerId());
     }
 
     return array();
@@ -750,7 +760,7 @@ function buildStats($activeRows, $finishedRows)
 
 function fetchActiveRows($conn)
 {
-    $allowedPrinterIds = fetchAllowedPrinterIds($conn, (int)CURRENT_COMPUTER_ID);
+    $allowedPrinterIds = fetchAllowedPrinterIds($conn, getEffectiveComputerId());
 
     // รวม voided/deleted (98) ด้วยเพื่อแสดงสีเทา
     $statusList = implode(', ', array(
@@ -815,7 +825,7 @@ function fetchActiveRows($conn)
 
 function fetchFinishedRows($conn)
 {
-    $allowedPrinterIds = fetchAllowedPrinterIds($conn, (int)CURRENT_COMPUTER_ID);
+    $allowedPrinterIds = fetchAllowedPrinterIds($conn, getEffectiveComputerId());
 
     $where = array('opf.ProcessStatus = ' . (int)PROCESS_STATUS_FINISHED);
     appendAllowedPrinterFilter($where, $allowedPrinterIds, 'opf');
@@ -1560,7 +1570,7 @@ function fetchLockedProcessRowByBarcode($conn, $processId, array $statuses)
         return null;
     }
 
-    $allowedPrinterIds = fetchAllowedPrinterIds($conn, (int)CURRENT_COMPUTER_ID);
+    $allowedPrinterIds = fetchAllowedPrinterIds($conn, getEffectiveComputerId());
     if (!$allowedPrinterIds) {
         return null;
     }
@@ -1808,7 +1818,7 @@ function buildCheckoutPrintServerPayload($row, $printerName, $finishStaffId, $fi
 
 function enqueueCheckoutPrintJob($conn, $sourceRow, $checkoutPrinterId, $finishStaffId, $finishedAt)
 {
-    $printer = findAvailablePrinterById($conn, (int)CURRENT_COMPUTER_ID, (int)$checkoutPrinterId);
+    $printer = findAvailablePrinterById($conn, getEffectiveComputerId(), (int)$checkoutPrinterId);
     if (!$printer) {
         throw new Exception('ไม่สามารถพิมพ์ไปยังเครื่องปริ๊นที่เลือกได้');
     }
@@ -1847,7 +1857,7 @@ function enqueueCheckoutPrintJob($conn, $sourceRow, $checkoutPrinterId, $finishS
     $printerId = (int)$printer['printer_id'];
     $printerName = isset($printer['printer_name']) ? (string)$printer['printer_name'] : ('Printer #' . $printerId);
     $printerProperty = isset($printer['printer_device_name']) ? (string)$printer['printer_device_name'] : '';
-    $jobOrderFromComputerId = (int)CURRENT_COMPUTER_ID;
+    $jobOrderFromComputerId = getEffectiveComputerId();
     $jobOrderStatus = 0;
 
     $sql = "
