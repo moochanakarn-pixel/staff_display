@@ -5,6 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><?php echo h(APP_TITLE); ?> - Staff Display</title>
+    <link rel="icon" type="image/svg+xml" href="logo.svg">
+    <link rel="apple-touch-icon" href="logo.svg">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1683ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Staff Display">
+    <meta name="mobile-web-app-capable" content="yes">
     <style>
         :root{
             --bg:#edf5ff;
@@ -182,7 +190,7 @@
     <div class="topbar">
         <div class="topbar-inner">
             <div class="brand">
-                <h1>Staff Display</h1>
+                <h1><img src="logo.svg" alt="" style="width:28px;height:28px;vertical-align:middle;margin-right:7px;border-radius:7px;flex-shrink:0"> Staff Display</h1>
                 <div class="brand-sub">
                     <span><?php echo h(APP_TITLE); ?> · หน้าดูสถานะอย่างเดียว</span>
                     <?php if ($machineDisplayName !== ''): ?><span class="machine-chip"><?php echo h($machineDisplayName); ?></span><?php endif; ?>

@@ -5,6 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><?php echo h(APP_TITLE); ?> - Staff Display</title>
+    <link rel="icon" type="image/svg+xml" href="logo.svg">
+    <link rel="apple-touch-icon" href="logo.svg">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1683ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Staff Display">
+    <meta name="mobile-web-app-capable" content="yes">
     <style>
         :root {
             --bg:#edf5ff;
@@ -296,6 +304,7 @@
 <div class="topbar">
     <div class="topbar-inner">
         <div class="topbar-left">
+            <img src="logo.svg" alt="Staff Display" style="width:36px;height:36px;border-radius:9px;flex-shrink:0">
             <div>
                 <div class="brand-title">Staff Display</div>
                 <div class="brand-sub">
