@@ -321,6 +321,11 @@ function renderGrid(){
 }
 
 /* ── Modal ── */
+function getTransactionId(key){
+    const row = safeArray(state.active).find(r => tKey(r) === key)
+             || safeArray(state.finished).find(r => tKey(r) === key);
+    return row && row.TransactionID ? parseInt(row.TransactionID, 10) : 0;
+}
 function buildRow(row){
     const st   = parseInt(row.ProcessStatus, 10);
     const done = st === PS_DONE, voided = st === PS_VOIDED;
@@ -350,7 +355,9 @@ function openModal(key, name){
     document.getElementById('tableModal').classList.add('open');
     document.body.style.overflow = 'hidden';
 
-    fetch('api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + cidParam + '&_=' + Date.now(), {cache:'no-store'})
+    const txId   = getTransactionId(key);
+    const txParam = txId > 0 ? '&transaction_id=' + txId : '';
+    fetch('api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + txParam + cidParam + '&_=' + Date.now(), {cache:'no-store'})
         .then(r => r.json())
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');

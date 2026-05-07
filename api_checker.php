@@ -413,12 +413,13 @@ function listTablesInZone($conn)
 
 function listTableOrders($conn)
 {
-    $tableId = requestString('table_id', '');
+    $tableId       = requestString('table_id', '');
+    $transactionId = requestInt('transaction_id', 0);
     if ($tableId === '') {
         jsonResponse(array('success' => false, 'error' => 'table_id required'));
         return;
     }
-    $rows = fetchTableOrders($conn, $tableId);
+    $rows = fetchTableOrders($conn, $tableId, $transactionId);
     jsonResponse(array(
         'success'      => true,
         'generated_at' => date('Y-m-d H:i:s'),
@@ -427,10 +428,9 @@ function listTableOrders($conn)
     ));
 }
 
-function fetchTableOrders($conn, $tableId)
+function fetchTableOrders($conn, $tableId, $transactionId = 0)
 {
-    $sql = "
-        SELECT
+    $selectCols = "
             opf.ProcessID,
             opf.SubProcessID,
             opf.TransactionID,
@@ -449,24 +449,25 @@ function fetchTableOrders($conn, $tableId)
             opf.DisplayTableName,
             opf.ProcessStatus,
             opf.SaleModeID,
-            COALESCE(sm.SaleModeName, '-') AS SaleModeName
-        FROM orderprocessdetailfront opf
-        LEFT JOIN salemode sm
-            ON sm.SaleModeID = opf.SaleModeID
-           AND sm.Deleted = 0
-        WHERE opf.TableID = ?
-          AND opf.SubmitOrderDateTime >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-        ORDER BY
-            opf.SubmitOrderDateTime ASC,
-            opf.ProcessID ASC,
-            opf.SubProcessID ASC
-    ";
-    $stmt = $conn->prepare($sql);
-    if (!$stmt) return array();
-    $stmt->bind_param('s', $tableId);
+            COALESCE(sm.SaleModeName, '-') AS SaleModeName";
+    $join = "LEFT JOIN salemode sm ON sm.SaleModeID = opf.SaleModeID AND sm.Deleted = 0";
+    $order = "ORDER BY opf.SubmitOrderDateTime ASC, opf.ProcessID ASC, opf.SubProcessID ASC";
+
+    if ($transactionId > 0) {
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.TransactionID = ? $order";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return array();
+        $stmt->bind_param('si', $tableId, $transactionId);
+    } else {
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.SubmitOrderDateTime >= DATE_SUB(NOW(), INTERVAL 24 HOUR) $order";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return array();
+        $stmt->bind_param('s', $tableId);
+    }
+
     $stmt->execute();
     $result = $stmt->get_result();
-    $rows = array();
+    $rows   = array();
     while ($row = $result->fetch_assoc()) {
         $rows[] = $row;
     }
