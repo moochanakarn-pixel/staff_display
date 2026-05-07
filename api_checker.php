@@ -394,7 +394,7 @@ function listTablesInZone($conn)
         return;
     }
     $stmt = $conn->prepare(
-        "SELECT TableID FROM tableno WHERE ZoneID = ? AND (Deleted = 0 OR Deleted IS NULL) ORDER BY TableID ASC"
+        "SELECT TableID FROM tableno WHERE ZoneID = ? AND (Deleted = 0 OR Deleted IS NULL) ORDER BY TableID ASC LIMIT 500"
     );
     if (!$stmt) {
         jsonResponse(array('success' => false, 'error' => $conn->error));

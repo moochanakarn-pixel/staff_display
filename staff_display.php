@@ -403,13 +403,18 @@ async function setZone(zid){
 
 /* ── Data ── */
 function setDot(s){ document.getElementById('statusDot').className='status-dot'+(s?' '+s:''); }
+let _loadController = null;
 async function loadAll(){
+    if(_loadController) _loadController.abort();
+    _loadController = new AbortController();
+    const sig = _loadController.signal;
     setDot('loading');
     try {
         const [ar,fr] = await Promise.all([
-            fetch('api_checker.php?action=list_active'  +cidParam+'&_='+Date.now(),{cache:'no-store'}).then(r=>r.json()),
-            fetch('api_checker.php?action=list_finished'+cidParam+'&_='+Date.now(),{cache:'no-store'}).then(r=>r.json()),
+            fetch('api_checker.php?action=list_active'  +cidParam+'&_='+Date.now(),{cache:'no-store',signal:sig}).then(r=>r.json()),
+            fetch('api_checker.php?action=list_finished'+cidParam+'&_='+Date.now(),{cache:'no-store',signal:sig}).then(r=>r.json()),
         ]);
+        if(sig.aborted) return;
         if(!ar.success) throw new Error(ar.error);
         if(!fr.success) throw new Error(fr.error);
         state.active   = safeArray(ar.active_rows);
@@ -418,7 +423,10 @@ async function loadAll(){
         const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!r.is_combined).length;
         document.title = pending > 0 ? `(${pending}) Staff Display` : 'Staff Display';
         renderGrid();
-    } catch(e){ setDot('error'); console.error(e); }
+    } catch(e){
+        if(e.name === 'AbortError') return;
+        setDot('error'); console.error(e);
+    }
 }
 
 /* ── Events ── */
