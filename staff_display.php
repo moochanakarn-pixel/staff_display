@@ -172,6 +172,66 @@
             .qty-badge{min-width:46px;min-height:46px;font-size:18px}
         }
     
+        /* ── View Toggle ── */
+        .view-toggle{display:flex;gap:3px;background:rgba(255,255,255,.12);border-radius:12px;padding:3px;flex-shrink:0}
+        .btn-view{appearance:none;border:none;border-radius:9px;min-height:30px;padding:0 13px;font-size:12px;font-weight:bold;cursor:pointer;color:rgba(255,255,255,.78);background:transparent;transition:background .15s,color .15s;white-space:nowrap}
+        .btn-view.active{background:#fff;color:var(--primary-dark)}
+
+        /* ── Table Grid ── */
+        .table-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:12px}
+        .table-card{
+            background:#fff;border:2px solid var(--line);border-radius:18px;
+            padding:16px 12px;text-align:center;cursor:pointer;
+            transition:transform .12s,box-shadow .12s;
+            box-shadow:0 4px 12px rgba(17,56,92,.07);
+            display:flex;flex-direction:column;align-items:center;gap:5px;
+            -webkit-tap-highlight-color:transparent;user-select:none
+        }
+        .table-card:active{transform:scale(.95)}
+        .table-card.status-yellow{border-color:#ffe066;background:linear-gradient(180deg,#fffde7,#fff);box-shadow:0 0 0 3px rgba(255,214,0,.18)}
+        .table-card.status-red{border-color:#ffb3ab;background:linear-gradient(180deg,#fff2f0,#fff);box-shadow:0 0 0 3px rgba(228,76,58,.14)}
+        .table-card-name{font-size:24px;font-weight:bold;line-height:1;color:#0f2945}
+        .table-card-count{font-size:12px;font-weight:bold;color:var(--muted)}
+        .table-card-dot{width:9px;height:9px;border-radius:50%;background:var(--success);margin-top:2px}
+        .table-card.status-yellow .table-card-dot{background:#f5a623}
+        .table-card.status-red .table-card-dot{background:var(--danger)}
+
+        /* ── Modal ── */
+        .modal-overlay{
+            display:none;position:fixed;inset:0;z-index:100;
+            background:rgba(8,30,60,.55);backdrop-filter:blur(4px);
+            align-items:flex-end;justify-content:center
+        }
+        .modal-overlay.open{display:flex}
+        .modal-box{
+            background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:620px;
+            max-height:88dvh;display:flex;flex-direction:column;
+            box-shadow:0 -14px 44px rgba(8,30,60,.22);
+            animation:slideUp .22s ease
+        }
+        @keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+        .modal-head{
+            display:flex;align-items:center;justify-content:space-between;gap:12px;
+            padding:16px 18px 12px;border-bottom:1px solid var(--line);flex-shrink:0
+        }
+        .modal-title{font-size:22px;font-weight:bold;color:#0f2945}
+        .modal-sub{font-size:13px;color:var(--muted);margin-top:3px}
+        .modal-close{
+            width:36px;height:36px;border-radius:50%;border:none;background:#f0f4f8;
+            color:#4a6080;font-size:22px;line-height:1;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;flex-shrink:0
+        }
+        .modal-body{overflow-y:auto;padding:12px 12px 28px;display:flex;flex-direction:column;gap:10px}
+        @media(min-width:620px){
+            .modal-overlay{align-items:center}
+            .modal-box{border-radius:24px;max-height:80dvh}
+        }
+        @media(max-width:560px){
+            .table-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:8px}
+            .table-card{padding:12px 8px}
+            .table-card-name{font-size:20px}
+        }
+
         /* ── Fullscreen Button ── */
         .btn-fullscreen{
             display:inline-flex;align-items:center;gap:5px;
@@ -197,6 +257,10 @@
                 </div>
             </div>
             <div class="controls">
+                <div class="view-toggle">
+                    <button type="button" class="btn-view active" data-view="list">รายการ</button>
+                    <button type="button" class="btn-view" data-view="table">โต๊ะ</button>
+                </div>
                 <button type="button" class="btn btn-filter active" data-filter="all">ทั้งหมด</button>
                 <button type="button" class="btn btn-filter" data-filter="active">ดูเฉพาะคิวค้าง</button>
                 <button type="button" class="btn btn-filter" data-filter="ready">ดูเฉพาะพร้อมเสิร์ฟแล้ว</button>
@@ -219,6 +283,10 @@
     </div>
 
     <div class="page">
+        <div id="tableView" class="hidden">
+            <div class="table-grid" id="tableGrid"></div>
+        </div>
+        <div id="listView">
         <div class="layout">
             <section class="panel" id="activePanel">
                 <div class="panel-head">
@@ -281,7 +349,21 @@
                 </section>
             </div>
         </div>
+        </div><!-- /listView -->
     </div>
+
+<div class="modal-overlay" id="tableModal">
+    <div class="modal-box">
+        <div class="modal-head">
+            <div>
+                <div class="modal-title" id="modalTableName">โต๊ะ -</div>
+                <div class="modal-sub" id="modalTableSub"></div>
+            </div>
+            <button class="modal-close" id="modalClose" aria-label="ปิด">×</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+    </div>
+</div>
 
 <script>
 const REFRESH_MS = <?php echo (int)APP_REFRESH_MS; ?>;
@@ -296,7 +378,8 @@ const state = {
     stats: { active_rows: 0, active_qty: 0, recent_finished_rows: 0 },
     active_rows: [],
     recent_finished_rows: [],
-    filter: 'all'
+    filter: 'all',
+    view: 'list'
 };
 
 function safeArray(v){ return Array.isArray(v) ? v : []; }
@@ -465,6 +548,8 @@ function updateView(){
     renderActiveRows(activeRows);
     renderFinishedRows(finishedRows);
     syncFilterButtons();
+    updateTabBadge(Number(state.stats.active_rows || 0));
+    if(state.view === 'table') renderTableGrid();
 }
 async function loadAll(){
     try {
@@ -492,6 +577,101 @@ async function loadAll(){
         document.getElementById('finishedList').innerHTML = '<div class="empty">โหลดรายการเสร็จไม่สำเร็จ</div>';
         console.error(error);
     }
+}
+
+// ── Table View helpers ──
+function tableKey(row){
+    return String(row.TableID || row.DisplayTableName || '-');
+}
+function groupByTable(activeRows, finishedRows){
+    const map = new Map();
+    safeArray(activeRows).forEach(function(row){
+        const key = tableKey(row);
+        if(!map.has(key)) map.set(key, { key:key, name: row.DisplayTableName || row.TableID || '-', active:[], ready:[] });
+        map.get(key).active.push(row);
+    });
+    safeArray(finishedRows).forEach(function(row){
+        const key = tableKey(row);
+        if(map.has(key)) map.get(key).ready.push(row);
+    });
+    return Array.from(map.values());
+}
+function getTableWorstStatus(activeRows){
+    let worst = 'normal';
+    activeRows.forEach(function(row){
+        if(row.is_voided || row.is_moved || row.is_combined) return;
+        const w = calcWaitMinutes(row);
+        if(w >= thresholdRed){ worst = 'red'; }
+        else if(w >= thresholdYellow && worst === 'normal'){ worst = 'yellow'; }
+    });
+    return worst;
+}
+function buildTableCard(group){
+    const status = getTableWorstStatus(group.active);
+    const pending = group.active.filter(function(r){ return !r.is_voided && !r.is_moved && !r.is_combined; }).length;
+    const readyCnt = group.ready.length;
+    const dotLabel = status === 'red' ? '🔴 เกินเวลา' : status === 'yellow' ? '🟡 ใกล้เวลา' : '🟢 ปกติ';
+    return `<div class="table-card status-${escapeHtml(status)}" data-table-key="${escapeHtml(group.key)}" data-table-name="${escapeHtml(String(group.name))}">
+        <div class="table-card-dot"></div>
+        <div class="table-card-name">${escapeHtml(String(group.name))}</div>
+        <div class="table-card-count">${pending} รายการค้าง</div>
+        ${readyCnt > 0 ? `<div class="table-card-count" style="color:var(--success)">✓ ${readyCnt} พร้อมเสิร์ฟ</div>` : ''}
+        <div style="font-size:11px;color:var(--muted);margin-top:1px">${dotLabel}</div>
+    </div>`;
+}
+function renderTableGrid(){
+    const wrap = document.getElementById('tableGrid');
+    const groups = groupByTable(state.active_rows, state.recent_finished_rows);
+    if(!groups.length){ wrap.innerHTML = '<div class="empty">ไม่มีโต๊ะที่มีคิวค้างอยู่</div>'; return; }
+    wrap.innerHTML = groups.map(buildTableCard).join('');
+}
+document.getElementById('tableGrid').addEventListener('click', function(e){
+    const card = e.target.closest('.table-card');
+    if(!card) return;
+    openTableModal(card.dataset.tableKey, card.dataset.tableName);
+});
+
+// ── Modal ──
+function openTableModal(key, name){
+    const activeRows = safeArray(state.active_rows).filter(function(r){ return tableKey(r) === key; });
+    const readyRows  = safeArray(state.recent_finished_rows).filter(function(r){ return tableKey(r) === key; });
+    document.getElementById('modalTableName').textContent = 'โต๊ะ ' + name;
+    document.getElementById('modalTableSub').textContent  = `${activeRows.length} รายการค้าง · ${readyRows.length} พร้อมเสิร์ฟ`;
+    let html = activeRows.map(function(r){ return buildCard(r, false); }).join('');
+    html    += readyRows.map(function(r){ return buildCard(r, true);  }).join('');
+    document.getElementById('modalBody').innerHTML = html || '<div class="empty">ไม่มีรายการ</div>';
+    document.getElementById('tableModal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+function closeTableModal(){
+    document.getElementById('tableModal').classList.remove('open');
+    document.body.style.overflow = '';
+}
+document.getElementById('modalClose').addEventListener('click', closeTableModal);
+document.getElementById('tableModal').addEventListener('click', function(e){
+    if(e.target === this) closeTableModal();
+});
+document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') closeTableModal();
+});
+
+// ── View toggle ──
+function setView(v){
+    state.view = v;
+    document.querySelectorAll('[data-view]').forEach(function(btn){
+        btn.classList.toggle('active', btn.dataset.view === v);
+    });
+    document.getElementById('listView').classList.toggle('hidden', v === 'table');
+    document.getElementById('tableView').classList.toggle('hidden', v === 'list');
+    if(v === 'table') renderTableGrid();
+}
+document.querySelectorAll('[data-view]').forEach(function(btn){
+    btn.addEventListener('click', function(){ setView(btn.dataset.view); });
+});
+
+// ── Tab badge ──
+function updateTabBadge(count){
+    document.title = count > 0 ? `(${count}) Staff Display` : 'Staff Display';
 }
 
 document.querySelectorAll('[data-filter]').forEach(function(btn){
