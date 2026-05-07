@@ -317,6 +317,14 @@ try {
         resolveStatus($conn);
     }
 
+    if ($method === 'GET' && $action === 'list_zones') {
+        listZones($conn);
+    }
+
+    if ($method === 'GET' && $action === 'list_tables_in_zone') {
+        listTablesInZone($conn);
+    }
+
     if ($method === 'GET' && $action === 'list_table_orders') {
         listTableOrders($conn);
     }
@@ -370,6 +378,37 @@ function listData($conn)
         'recent_finished_rows' => $finishedRows,
         'filters' => buildFilterInfo($conn, $overridePrintServerUrl),
     ));
+}
+
+function listZones($conn)
+{
+    $rows = fetchAllRows($conn, "SELECT ZoneID, ZoneName FROM tablezone ORDER BY ZoneID ASC");
+    jsonResponse(array('success' => true, 'zones' => $rows ?: array()));
+}
+
+function listTablesInZone($conn)
+{
+    $zoneId = requestInt('zone_id', 0);
+    if ($zoneId <= 0) {
+        jsonResponse(array('success' => false, 'error' => 'zone_id required'));
+        return;
+    }
+    $stmt = $conn->prepare(
+        "SELECT TableID FROM tableno WHERE ZoneID = ? AND (Deleted = 0 OR Deleted IS NULL) ORDER BY TableID ASC"
+    );
+    if (!$stmt) {
+        jsonResponse(array('success' => false, 'error' => $conn->error));
+        return;
+    }
+    $stmt->bind_param('i', $zoneId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $tables = array();
+    while ($row = $result->fetch_assoc()) {
+        $tables[] = array('TableID' => $row['TableID']);
+    }
+    $stmt->close();
+    jsonResponse(array('success' => true, 'zone_id' => $zoneId, 'tables' => $tables));
 }
 
 function listTableOrders($conn)

@@ -172,6 +172,14 @@
             .qty-badge{min-width:46px;min-height:46px;font-size:18px}
         }
     
+        /* ── Zone Filter Bar ── */
+        .zone-bar{background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+        .zone-bar-inner{max-width:1920px;margin:0 auto;padding:8px 10px;display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+        .zone-bar-inner::-webkit-scrollbar{display:none}
+        .btn-zone{appearance:none;border:1px solid var(--line);border-radius:999px;height:34px;padding:0 16px;font-size:13px;font-weight:bold;cursor:pointer;background:#fff;color:var(--muted);white-space:nowrap;transition:background .14s,color .14s,border-color .14s;flex-shrink:0;touch-action:manipulation}
+        .btn-zone:active{transform:scale(.96)}
+        .btn-zone.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
         /* ── Complete Tables Bar ── */
         .complete-bar{max-width:1920px;margin:0 auto 0;padding:8px 10px 0}
         .complete-bar-inner{
@@ -208,6 +216,9 @@
         .table-card:active{transform:scale(.95)}
         .table-card.status-yellow{border-color:#ffe066;background:linear-gradient(180deg,#fffde7,#fff);box-shadow:0 0 0 3px rgba(255,214,0,.18)}
         .table-card.status-red{border-color:#ffb3ab;background:linear-gradient(180deg,#fff2f0,#fff);box-shadow:0 0 0 3px rgba(228,76,58,.14)}
+        .table-card.status-empty{border-color:#e5e7eb;background:#f9fafb;box-shadow:none;opacity:.72;cursor:default}
+        .table-card.status-empty .table-card-name{color:#9ca3af}
+        .table-card.status-empty .table-card-dot{background:#d1d5db}
         .table-card.status-complete{border-color:#6edda0;background:linear-gradient(180deg,#edfff5,#f4fff9);box-shadow:0 0 0 3px rgba(18,161,80,.18)}
         .table-card.status-complete .table-card-dot{background:var(--success)}
         .table-card.status-complete .table-card-name{color:#0b7a3e}
@@ -319,6 +330,10 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <div id="zoneBar" class="zone-bar hidden">
+        <div class="zone-bar-inner" id="zoneInner"></div>
     </div>
 
     <div class="stats">
@@ -433,7 +448,10 @@ const state = {
     active_rows: [],
     recent_finished_rows: [],
     filter: 'all',
-    view: 'list'
+    view: 'list',
+    zones: [],
+    zoneId: null,
+    zoneTables: null
 };
 
 function safeArray(v){ return Array.isArray(v) ? v : []; }
@@ -564,11 +582,15 @@ function renderFinishedRows(rows){
             </div>`;
     }).join('');
 }
+function filterByZone(rows){
+    if(!state.zoneTables) return safeArray(rows);
+    return safeArray(rows).filter(function(r){ return state.zoneTables.has(String(r.TableID || '')); });
+}
 function getFilteredActiveRows(){
-    return state.filter === 'ready' ? [] : safeArray(state.active_rows);
+    return filterByZone(state.filter === 'ready' ? [] : state.active_rows);
 }
 function getFilteredFinishedRows(){
-    return state.filter === 'active' ? [] : safeArray(state.recent_finished_rows);
+    return filterByZone(state.filter === 'active' ? [] : state.recent_finished_rows);
 }
 function syncFilterButtons(){
     document.querySelectorAll('[data-filter]').forEach(function(btn){
@@ -667,6 +689,13 @@ function isTableComplete(group){
     return pending.length === 0 && group.ready.length > 0;
 }
 function buildTableCard(group){
+    if(group.isEmpty){
+        return `<div class="table-card status-empty">
+            <div class="table-card-dot"></div>
+            <div class="table-card-name">${escapeHtml(String(group.name))}</div>
+            <div class="table-card-count">ว่าง</div>
+        </div>`;
+    }
     const complete = isTableComplete(group);
     const status = complete ? 'complete' : getTableWorstStatus(group.active);
     const pending = group.active.filter(function(r){ return !r.is_voided && !r.is_moved && !r.is_combined; }).length;
@@ -711,8 +740,23 @@ document.getElementById('completeChips').addEventListener('click', function(e){
 });
 function renderTableGrid(){
     const wrap = document.getElementById('tableGrid');
-    const groups = groupByTable(state.active_rows, state.recent_finished_rows);
-    if(!groups.length){ wrap.innerHTML = '<div class="empty">ไม่มีโต๊ะที่มีคิวค้างอยู่</div>'; return; }
+    const groups = groupByTable(filterByZone(state.active_rows), filterByZone(state.recent_finished_rows));
+    const groupKeys = new Set(groups.map(function(g){ return g.key; }));
+
+    if(state.zoneTables){
+        state.zoneTables.forEach(function(tid){
+            if(!groupKeys.has(tid)){
+                groups.push({ key:tid, name:tid, active:[], ready:[], isEmpty:true });
+            }
+        });
+        groups.sort(function(a, b){
+            if(a.isEmpty && !b.isEmpty) return 1;
+            if(!a.isEmpty && b.isEmpty) return -1;
+            return String(a.name).localeCompare(String(b.name), 'th');
+        });
+    }
+
+    if(!groups.length){ wrap.innerHTML = '<div class="empty">ไม่มีโต๊ะ</div>'; return; }
     wrap.innerHTML = groups.map(buildTableCard).join('');
 }
 document.getElementById('tableGrid').addEventListener('click', function(e){
@@ -788,6 +832,50 @@ document.addEventListener('keydown', function(e){
     if(e.key === 'Escape') closeTableModal();
 });
 
+// ── Zone Filter ──
+async function loadZones(){
+    try {
+        const res = await fetch('api_checker.php?action=list_zones' + cidParam + '&_=' + Date.now(), { cache:'no-store' });
+        const json = await res.json();
+        if(!json.success || !safeArray(json.zones).length) return;
+        state.zones = safeArray(json.zones);
+        renderZoneButtons();
+    } catch(e){ console.error('loadZones', e); }
+}
+function renderZoneButtons(){
+    const bar   = document.getElementById('zoneBar');
+    const inner = document.getElementById('zoneInner');
+    if(!state.zones.length){ bar.classList.add('hidden'); return; }
+    inner.innerHTML = `<button class="btn-zone active" data-zone-id="">ทั้งหมด</button>`
+        + state.zones.map(function(z){
+            return `<button class="btn-zone" data-zone-id="${escapeHtml(String(z.ZoneID))}">${escapeHtml(z.ZoneName || String(z.ZoneID))}</button>`;
+        }).join('');
+    bar.classList.remove('hidden');
+}
+async function setZone(zoneId){
+    state.zoneId = zoneId || null;
+    document.querySelectorAll('.btn-zone').forEach(function(btn){
+        btn.classList.toggle('active', btn.dataset.zoneId === (zoneId || ''));
+    });
+    if(zoneId){
+        try {
+            const res = await fetch('api_checker.php?action=list_tables_in_zone&zone_id=' + encodeURIComponent(zoneId) + cidParam + '&_=' + Date.now(), { cache:'no-store' });
+            const json = await res.json();
+            state.zoneTables = json.success
+                ? new Set(safeArray(json.tables).map(function(t){ return String(t.TableID); }))
+                : null;
+        } catch(e){ state.zoneTables = null; console.error('setZone', e); }
+    } else {
+        state.zoneTables = null;
+    }
+    updateView();
+}
+document.getElementById('zoneInner').addEventListener('click', function(e){
+    const btn = e.target.closest('.btn-zone');
+    if(!btn) return;
+    setZone(btn.dataset.zoneId || '');
+});
+
 // ── View toggle ──
 function setView(v){
     state.view = v;
@@ -822,6 +910,7 @@ function handleDisplayVisibilityChange(){
 }
 
 loadAll();
+loadZones();
 setInterval(function(){
     if (!document.hidden) {
         loadAll();
