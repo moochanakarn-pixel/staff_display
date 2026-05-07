@@ -317,6 +317,10 @@ try {
         resolveStatus($conn);
     }
 
+    if ($method === 'GET' && $action === 'list_table_orders') {
+        listTableOrders($conn);
+    }
+
     if ($method === 'GET' && $action === 'list_active') {
         listActiveData($conn);
     }
@@ -366,6 +370,69 @@ function listData($conn)
         'recent_finished_rows' => $finishedRows,
         'filters' => buildFilterInfo($conn, $overridePrintServerUrl),
     ));
+}
+
+function listTableOrders($conn)
+{
+    $tableId = requestString('table_id', '');
+    if ($tableId === '') {
+        jsonResponse(array('success' => false, 'error' => 'table_id required'));
+        return;
+    }
+    $rows = fetchTableOrders($conn, $tableId);
+    jsonResponse(array(
+        'success'      => true,
+        'generated_at' => date('Y-m-d H:i:s'),
+        'table_id'     => $tableId,
+        'rows'         => $rows,
+    ));
+}
+
+function fetchTableOrders($conn, $tableId)
+{
+    $sql = "
+        SELECT
+            opf.ProcessID,
+            opf.SubProcessID,
+            opf.TransactionID,
+            opf.ComputerID,
+            opf.OrderDetailID,
+            opf.ProductID,
+            opf.ProductName,
+            opf.ProductAmount,
+            opf.ProductSetType,
+            opf.ParentProcessID,
+            opf.SubmitOrderDateTime,
+            opf.FinishDateTime,
+            opf.OrderNo,
+            opf.OrderDate,
+            opf.TableID,
+            opf.DisplayTableName,
+            opf.ProcessStatus,
+            opf.SaleModeID,
+            COALESCE(sm.SaleModeName, '-') AS SaleModeName
+        FROM orderprocessdetailfront opf
+        LEFT JOIN salemode sm
+            ON sm.SaleModeID = opf.SaleModeID
+           AND sm.Deleted = 0
+        WHERE opf.TableID = ?
+          AND opf.OrderDate = CURDATE()
+        ORDER BY
+            opf.SubmitOrderDateTime ASC,
+            opf.ProcessID ASC,
+            opf.SubProcessID ASC
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) return array();
+    $stmt->bind_param('s', $tableId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $rows = array();
+    while ($row = $result->fetch_assoc()) {
+        $rows[] = $row;
+    }
+    $stmt->close();
+    return attachCommentsToRows($conn, $rows);
 }
 
 function listActiveData($conn)

@@ -251,11 +251,24 @@
             padding:10px 14px;background:#fff;font-size:13px;
         }
         .compact-row:nth-child(even){background:#f8fbff}
+        .compact-row.row-done{background:#f0fff6}
+        .compact-row.row-done:nth-child(even){background:#e8fdf0}
+        .compact-row.row-active{background:#fff8f2}
+        .compact-row.row-active:nth-child(even){background:#fff3e8}
+        .compact-row.row-voided{background:#f3f4f6;opacity:.7}
         .compact-row-name{font-weight:bold;color:#0f2945;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .compact-row.row-done .compact-row-name{color:#0b7a3e}
+        .compact-row.row-voided .compact-row-name{color:#9ca3af;text-decoration:line-through}
         .compact-row-meta{font-size:11px;color:var(--muted);margin-top:1px}
         .compact-row-right{text-align:right;flex-shrink:0}
-        .compact-row-qty{font-size:16px;font-weight:bold;color:var(--success)}
-        .compact-row-time{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap}
+        .compact-row-qty{font-size:16px;font-weight:bold;color:#0f2945}
+        .compact-row.row-done .compact-row-qty{color:var(--success)}
+        .compact-row.row-active .compact-row-qty{color:var(--secondary)}
+        .compact-row-status{font-size:11px;font-weight:bold;margin-top:1px;white-space:nowrap}
+        .compact-row.row-done .compact-row-status{color:var(--success)}
+        .compact-row.row-active .compact-row-status{color:var(--secondary)}
+        .compact-row.row-voided .compact-row-status{color:#9ca3af}
+        .modal-loading{padding:28px;text-align:center;color:var(--muted);font-size:14px;font-weight:bold}
         @media(min-width:620px){
             .modal-overlay{align-items:center}
             .modal-box{border-radius:24px;max-height:80dvh}
@@ -708,38 +721,60 @@ document.getElementById('tableGrid').addEventListener('click', function(e){
     openTableModal(card.dataset.tableKey, card.dataset.tableName);
 });
 
-function buildCompactRow(row){
-    const name = row.parent_name ? `${escapeHtml(row.parent_name)} · ${escapeHtml(row.ProductName || '-')}` : escapeHtml(row.ProductName || '-');
-    return `<div class="compact-row">
+const PS_FINISHED = 1;
+const PS_VOIDED   = 98;
+
+function buildTableRow(row){
+    const status = parseInt(row.ProcessStatus, 10);
+    const isDone   = status === PS_FINISHED;
+    const isVoided = status === PS_VOIDED;
+    const rowClass = isDone ? 'row-done' : isVoided ? 'row-voided' : 'row-active';
+    const statusLabel = isDone ? '✅ เสร็จแล้ว' : isVoided ? '🚫 ยกเลิก' : '⏳ ในครัว';
+    const timeInfo = isDone
+        ? `ส่ง ${escapeHtml(formatTime(row.SubmitOrderDateTime))} · เสร็จ ${escapeHtml(formatTime(row.FinishDateTime))}`
+        : `ส่ง ${escapeHtml(formatTime(row.SubmitOrderDateTime))}`;
+    const name = row.parent_name
+        ? `${escapeHtml(row.parent_name)} · ${escapeHtml(row.ProductName || '-')}`
+        : escapeHtml(row.ProductName || '-');
+    return `<div class="compact-row ${rowClass}">
         <div>
             <div class="compact-row-name">${name}</div>
-            <div class="compact-row-meta">ส่ง ${escapeHtml(formatTime(row.SubmitOrderDateTime))}</div>
+            <div class="compact-row-meta">${timeInfo}</div>
         </div>
         <div class="compact-row-right">
             <div class="compact-row-qty">x${formatQty(row.ProductAmount)}</div>
-            <div class="compact-row-time">เสร็จ ${escapeHtml(formatTime(row.FinishDateTime))}</div>
+            <div class="compact-row-status">${statusLabel}</div>
         </div>
     </div>`;
 }
 
 // ── Modal ──
 function openTableModal(key, name){
-    const activeRows = safeArray(state.active_rows).filter(function(r){ return tableKey(r) === key; });
-    const readyRows  = safeArray(state.recent_finished_rows).filter(function(r){ return tableKey(r) === key; });
     document.getElementById('modalTableName').textContent = 'โต๊ะ ' + name;
-    document.getElementById('modalTableSub').textContent  = `${activeRows.length} รายการค้าง · ${readyRows.length} พร้อมเสิร์ฟ`;
-    let html = '';
-    if(activeRows.length){
-        html += '<div class="modal-section-label">ยังค้างอยู่</div>';
-        html += activeRows.map(function(r){ return buildCard(r, false); }).join('');
-    }
-    if(readyRows.length){
-        html += '<div class="modal-section-label">พร้อมเสิร์ฟแล้ว</div>';
-        html += `<div class="compact-list">${readyRows.map(buildCompactRow).join('')}</div>`;
-    }
-    document.getElementById('modalBody').innerHTML = html || '<div class="empty">ไม่มีรายการ</div>';
+    document.getElementById('modalTableSub').textContent  = '';
+    document.getElementById('modalBody').innerHTML = '<div class="modal-loading">กำลังโหลด...</div>';
     document.getElementById('tableModal').classList.add('open');
     document.body.style.overflow = 'hidden';
+
+    const url = 'api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + cidParam + '&_=' + Date.now();
+    fetch(url, { cache: 'no-store' })
+        .then(function(r){ return r.json(); })
+        .then(function(json){
+            if(!json.success) throw new Error(json.error || 'โหลดไม่สำเร็จ');
+            const rows = safeArray(json.rows);
+            const done    = rows.filter(function(r){ return parseInt(r.ProcessStatus,10) === PS_FINISHED; }).length;
+            const pending = rows.filter(function(r){ return parseInt(r.ProcessStatus,10) !== PS_FINISHED && parseInt(r.ProcessStatus,10) !== PS_VOIDED; }).length;
+            const voided  = rows.filter(function(r){ return parseInt(r.ProcessStatus,10) === PS_VOIDED; }).length;
+            document.getElementById('modalTableSub').textContent =
+                `เสร็จ ${done} · ในครัว ${pending} · ยกเลิก ${voided}`;
+            const body = document.getElementById('modalBody');
+            if(!rows.length){ body.innerHTML = '<div class="empty">ไม่มีรายการวันนี้</div>'; return; }
+            body.innerHTML = `<div class="compact-list">${rows.map(buildTableRow).join('')}</div>`;
+        })
+        .catch(function(err){
+            document.getElementById('modalBody').innerHTML = '<div class="empty">โหลดไม่สำเร็จ</div>';
+            console.error(err);
+        });
 }
 function closeTableModal(){
     document.getElementById('tableModal').classList.remove('open');
