@@ -172,6 +172,24 @@
             .qty-badge{min-width:46px;min-height:46px;font-size:18px}
         }
     
+        /* ── Complete Tables Bar ── */
+        .complete-bar{max-width:1920px;margin:0 auto 0;padding:8px 10px 0}
+        .complete-bar-inner{
+            background:linear-gradient(135deg,#0b7a3e,#12a150);
+            border-radius:16px;padding:12px 16px;
+            display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+            box-shadow:0 4px 18px rgba(18,161,80,.28)
+        }
+        .complete-bar-label{font-size:15px;font-weight:bold;color:#fff;white-space:nowrap;flex-shrink:0}
+        .complete-bar-chips{display:flex;gap:8px;flex-wrap:wrap}
+        .complete-chip{
+            background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.32);
+            color:#fff;padding:6px 16px;border-radius:999px;
+            font-size:14px;font-weight:bold;cursor:pointer;
+            transition:background .14s;-webkit-tap-highlight-color:transparent
+        }
+        .complete-chip:active{background:rgba(255,255,255,.38)}
+
         /* ── View Toggle ── */
         .view-toggle{display:flex;gap:3px;background:rgba(255,255,255,.12);border-radius:12px;padding:3px;flex-shrink:0}
         .btn-view{appearance:none;border:none;border-radius:9px;min-height:30px;padding:0 13px;font-size:12px;font-weight:bold;cursor:pointer;color:rgba(255,255,255,.78);background:transparent;transition:background .15s,color .15s;white-space:nowrap}
@@ -190,6 +208,9 @@
         .table-card:active{transform:scale(.95)}
         .table-card.status-yellow{border-color:#ffe066;background:linear-gradient(180deg,#fffde7,#fff);box-shadow:0 0 0 3px rgba(255,214,0,.18)}
         .table-card.status-red{border-color:#ffb3ab;background:linear-gradient(180deg,#fff2f0,#fff);box-shadow:0 0 0 3px rgba(228,76,58,.14)}
+        .table-card.status-complete{border-color:#6edda0;background:linear-gradient(180deg,#edfff5,#f4fff9);box-shadow:0 0 0 3px rgba(18,161,80,.18)}
+        .table-card.status-complete .table-card-dot{background:var(--success)}
+        .table-card.status-complete .table-card-name{color:#0b7a3e}
         .table-card-name{font-size:24px;font-weight:bold;line-height:1;color:#0f2945}
         .table-card-count{font-size:12px;font-weight:bold;color:var(--muted)}
         .table-card-dot{width:9px;height:9px;border-radius:50%;background:var(--success);margin-top:2px}
@@ -280,6 +301,13 @@
         <div class="stat"><div class="stat-label">รายการค้าง</div><div class="stat-value" id="statActiveQty">0</div></div>
         <div class="stat"><div class="stat-label">พร้อมเสิร์ฟแล้ว</div><div class="stat-value" id="statFinishedRows">0</div></div>
         <div class="stat"><div class="stat-label">สถานะ</div><div class="stat-value" id="statStatusText" style="font-size:15px;color:var(--success)">พร้อมใช้งาน</div></div>
+    </div>
+
+    <div id="completeTablesBar" class="complete-bar hidden">
+        <div class="complete-bar-inner">
+            <span class="complete-bar-label">🍽️ พร้อมเสิร์ฟครบแล้ว</span>
+            <div class="complete-bar-chips" id="completeChips"></div>
+        </div>
     </div>
 
     <div class="page">
@@ -549,6 +577,7 @@ function updateView(){
     renderFinishedRows(finishedRows);
     syncFilterButtons();
     updateTabBadge(Number(state.stats.active_rows || 0));
+    renderCompleteTables();
     if(state.view === 'table') renderTableGrid();
 }
 async function loadAll(){
@@ -592,7 +621,8 @@ function groupByTable(activeRows, finishedRows){
     });
     safeArray(finishedRows).forEach(function(row){
         const key = tableKey(row);
-        if(map.has(key)) map.get(key).ready.push(row);
+        if(!map.has(key)) map.set(key, { key:key, name: row.DisplayTableName || row.TableID || '-', active:[], ready:[] });
+        map.get(key).ready.push(row);
     });
     return Array.from(map.values());
 }
@@ -606,19 +636,53 @@ function getTableWorstStatus(activeRows){
     });
     return worst;
 }
+function isTableComplete(group){
+    const pending = group.active.filter(function(r){ return !r.is_voided && !r.is_moved && !r.is_combined; });
+    return pending.length === 0 && group.ready.length > 0;
+}
 function buildTableCard(group){
-    const status = getTableWorstStatus(group.active);
+    const complete = isTableComplete(group);
+    const status = complete ? 'complete' : getTableWorstStatus(group.active);
     const pending = group.active.filter(function(r){ return !r.is_voided && !r.is_moved && !r.is_combined; }).length;
     const readyCnt = group.ready.length;
-    const dotLabel = status === 'red' ? '🔴 เกินเวลา' : status === 'yellow' ? '🟡 ใกล้เวลา' : '🟢 ปกติ';
+    const dotLabel = complete ? '✅ ครบทุกจานแล้ว'
+        : status === 'red' ? '🔴 เกินเวลา'
+        : status === 'yellow' ? '🟡 ใกล้เวลา' : '🟢 ปกติ';
     return `<div class="table-card status-${escapeHtml(status)}" data-table-key="${escapeHtml(group.key)}" data-table-name="${escapeHtml(String(group.name))}">
         <div class="table-card-dot"></div>
         <div class="table-card-name">${escapeHtml(String(group.name))}</div>
-        <div class="table-card-count">${pending} รายการค้าง</div>
+        ${pending > 0 ? `<div class="table-card-count">${pending} รายการค้าง</div>` : ''}
         ${readyCnt > 0 ? `<div class="table-card-count" style="color:var(--success)">✓ ${readyCnt} พร้อมเสิร์ฟ</div>` : ''}
         <div style="font-size:11px;color:var(--muted);margin-top:1px">${dotLabel}</div>
     </div>`;
 }
+
+// ── Complete Tables Bar ──
+function getCompleteTables(){
+    const activeKeys = new Set(safeArray(state.active_rows).map(tableKey));
+    const finishedMap = new Map();
+    safeArray(state.recent_finished_rows).forEach(function(row){
+        const key = tableKey(row);
+        if(!finishedMap.has(key)) finishedMap.set(key, { key:key, name: row.DisplayTableName || row.TableID || '-', count:0 });
+        finishedMap.get(key).count++;
+    });
+    return Array.from(finishedMap.values()).filter(function(t){ return !activeKeys.has(t.key); });
+}
+function renderCompleteTables(){
+    const bar = document.getElementById('completeTablesBar');
+    const chips = document.getElementById('completeChips');
+    const tables = getCompleteTables();
+    if(!tables.length){ bar.classList.add('hidden'); return; }
+    chips.innerHTML = tables.map(function(t){
+        return `<span class="complete-chip" data-table-key="${escapeHtml(t.key)}" data-table-name="${escapeHtml(String(t.name))}">โต๊ะ ${escapeHtml(String(t.name))} (${t.count})</span>`;
+    }).join('');
+    bar.classList.remove('hidden');
+}
+document.getElementById('completeChips').addEventListener('click', function(e){
+    const chip = e.target.closest('.complete-chip');
+    if(!chip) return;
+    openTableModal(chip.dataset.tableKey, chip.dataset.tableName);
+});
 function renderTableGrid(){
     const wrap = document.getElementById('tableGrid');
     const groups = groupByTable(state.active_rows, state.recent_finished_rows);
