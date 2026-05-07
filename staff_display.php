@@ -243,6 +243,19 @@
             display:flex;align-items:center;justify-content:center;flex-shrink:0
         }
         .modal-body{overflow-y:auto;padding:12px 12px 28px;display:flex;flex-direction:column;gap:10px}
+        .modal-section-label{font-size:11px;font-weight:bold;color:var(--muted);letter-spacing:.5px;padding:0 2px;margin-bottom:-4px}
+        .compact-list{display:flex;flex-direction:column;gap:1px;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+        .compact-row{
+            display:grid;grid-template-columns:minmax(0,1fr) auto;
+            align-items:center;gap:8px;
+            padding:10px 14px;background:#fff;font-size:13px;
+        }
+        .compact-row:nth-child(even){background:#f8fbff}
+        .compact-row-name{font-weight:bold;color:#0f2945;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .compact-row-meta{font-size:11px;color:var(--muted);margin-top:1px}
+        .compact-row-right{text-align:right;flex-shrink:0}
+        .compact-row-qty{font-size:16px;font-weight:bold;color:var(--success)}
+        .compact-row-time{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap}
         @media(min-width:620px){
             .modal-overlay{align-items:center}
             .modal-box{border-radius:24px;max-height:80dvh}
@@ -695,14 +708,35 @@ document.getElementById('tableGrid').addEventListener('click', function(e){
     openTableModal(card.dataset.tableKey, card.dataset.tableName);
 });
 
+function buildCompactRow(row){
+    const name = row.parent_name ? `${escapeHtml(row.parent_name)} · ${escapeHtml(row.ProductName || '-')}` : escapeHtml(row.ProductName || '-');
+    return `<div class="compact-row">
+        <div>
+            <div class="compact-row-name">${name}</div>
+            <div class="compact-row-meta">ส่ง ${escapeHtml(formatTime(row.SubmitOrderDateTime))}</div>
+        </div>
+        <div class="compact-row-right">
+            <div class="compact-row-qty">x${formatQty(row.ProductAmount)}</div>
+            <div class="compact-row-time">เสร็จ ${escapeHtml(formatTime(row.FinishDateTime))}</div>
+        </div>
+    </div>`;
+}
+
 // ── Modal ──
 function openTableModal(key, name){
     const activeRows = safeArray(state.active_rows).filter(function(r){ return tableKey(r) === key; });
     const readyRows  = safeArray(state.recent_finished_rows).filter(function(r){ return tableKey(r) === key; });
     document.getElementById('modalTableName').textContent = 'โต๊ะ ' + name;
     document.getElementById('modalTableSub').textContent  = `${activeRows.length} รายการค้าง · ${readyRows.length} พร้อมเสิร์ฟ`;
-    let html = activeRows.map(function(r){ return buildCard(r, false); }).join('');
-    html    += readyRows.map(function(r){ return buildCard(r, true);  }).join('');
+    let html = '';
+    if(activeRows.length){
+        html += '<div class="modal-section-label">ยังค้างอยู่</div>';
+        html += activeRows.map(function(r){ return buildCard(r, false); }).join('');
+    }
+    if(readyRows.length){
+        html += '<div class="modal-section-label">พร้อมเสิร์ฟแล้ว</div>';
+        html += `<div class="compact-list">${readyRows.map(buildCompactRow).join('')}</div>`;
+    }
     document.getElementById('modalBody').innerHTML = html || '<div class="empty">ไม่มีรายการ</div>';
     document.getElementById('tableModal').classList.add('open');
     document.body.style.overflow = 'hidden';
