@@ -455,7 +455,7 @@ function fetchTableOrders($conn, $tableId)
             ON sm.SaleModeID = opf.SaleModeID
            AND sm.Deleted = 0
         WHERE opf.TableID = ?
-          AND opf.OrderDate = CURDATE()
+          AND opf.SubmitOrderDateTime >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
         ORDER BY
             opf.SubmitOrderDateTime ASC,
             opf.ProcessID ASC,
