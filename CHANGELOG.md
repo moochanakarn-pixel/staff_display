@@ -1,5 +1,27 @@
 # Changelog — Staff Display
 
+## [1.6.0] — 2026-05-08
+
+### แก้ไขบัค
+- `nonKds(row, set)` — รวม logic ตรวจ non-KDS เป็นฟังก์ชันเดียว แทนที่จะมี `isNonKds` และ `isAutoD` แยกกัน 2 ที่
+- ลบเงื่อนไข `pid > 0` ออกจาก non-KDS check — item ที่ `PrinterID = 0` (เช่น set menu parent) ก็ถูก auto-done ด้วยเมื่อไม่อยู่ใน allowed printer set
+- Title bar `(X) Staff Display` — แก้ให้นับ pending ผ่าน `isNonKds` filter เหมือน grid card (เดิมตัวเลขสูงกว่าจริง)
+- `openModal` — เพิ่ม `AbortController` (`_modalController`) ยกเลิก fetch เก่าทันทีเมื่อกดโต๊ะใหม่ก่อน response กลับมา ป้องกัน modal แสดงข้อมูลผิดโต๊ะ
+- `fmtTime()` — fallback datetime ผ่าน `esc()` ป้องกัน raw string แสดงใน HTML
+
+---
+
+## [1.5.0] — 2026-05-08
+
+### เพิ่มใหม่ / แก้ไข
+- `list_table_orders` ส่ง `allowed_printer_ids` กลับมาใน response โดยตรง — modal ใช้ค่าจาก call เดียวกันแทนการพึ่ง `state.allowedPrinters` จาก `list_active` ที่อาจยังไม่ถูก populate
+- `buildRow(row, printerSet)` รับ printerSet เป็น parameter — การ render modal ไม่ขึ้นกับ global state
+
+### แก้ไขบัค
+- Items จาก printer station อื่น แสดงเป็น "กำลังทำ" ใน modal แม้ grid card จะถูกแล้ว — เพราะ `buildRow` เดิมใช้ `state.allowedPrinters` ซึ่งอาจ null ขณะ modal render
+
+---
+
 ## [1.4.0] — 2026-05-08
 
 ### เพิ่มใหม่
