@@ -442,6 +442,7 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '')
             opf.TransactionID,
             opf.ComputerID,
             opf.OrderDetailID,
+            opf.PrinterID,
             opf.ProductID,
             opf.ProductName,
             opf.ProductAmount,
