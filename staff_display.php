@@ -236,7 +236,8 @@ const state = {
     finished: [],
     zones:    [],
     zoneId:   null,
-    zoneTables: null   // Set<string> | null
+    zoneTables:      null,   // Set<string> | null
+    allowedPrinters: null,   // Set<number> | null (null = no filter)
 };
 
 /* ── Utilities ── */
@@ -257,6 +258,11 @@ function waitMin(row){
     return isNaN(d) ? 0 : Math.max(0,Math.floor((Date.now()-d)/60000));
 }
 function tKey(row){ return String(row.TableID || row.DisplayTableName || '-'); }
+function isNonKds(row){
+    if(!state.allowedPrinters || state.allowedPrinters.size === 0) return false;
+    const pid = parseInt(row.PrinterID, 10);
+    return pid > 0 && !state.allowedPrinters.has(pid);
+}
 function byZone(rows){
     if(!state.zoneTables) return safeArray(rows);
     return safeArray(rows).filter(r => state.zoneTables.has(tKey(r)));
@@ -271,7 +277,7 @@ function groupTables(active, finished){
     }
     safeArray(active).forEach(r => {
         const g = get(tKey(r), r.DisplayTableName || r.TableID || '-');
-        if(!r.is_voided && !r.is_moved && !r.is_combined){
+        if(!r.is_voided && !r.is_moved && !r.is_combined && !isNonKds(r)){
             g.pending++;
             g.worst = Math.max(g.worst, waitMin(r));
         }
@@ -338,10 +344,12 @@ function getOrderDate(key){
     return row && row.OrderDate ? String(row.OrderDate).slice(0,10) : '';
 }
 function buildRow(row){
-    const st   = parseInt(row.ProcessStatus, 10);
-    const done = st === PS_DONE, voided = st === PS_VOIDED;
-    const cls  = done ? 'r-done' : voided ? 'r-voided' : 'r-active';
-    const lbl  = done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
+    const st     = parseInt(row.ProcessStatus, 10);
+    const autoDone = !row.is_voided && isNonKds(row);
+    const done   = st === PS_DONE || autoDone;
+    const voided = !autoDone && st === PS_VOIDED;
+    const cls    = done ? 'r-done' : voided ? 'r-voided' : 'r-active';
+    const lbl    = done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
     const name = row.parent_name
         ? `${esc(row.parent_name)} · ${esc(row.ProductName||'-')}`
         : esc(row.ProductName||'-');
@@ -439,6 +447,8 @@ async function loadAll(){
         if(!fr.success) throw new Error(fr.error);
         state.active   = safeArray(ar.active_rows);
         state.finished = safeArray(fr.recent_finished_rows);
+        const pids = Array.isArray(ar.allowed_printer_ids) ? ar.allowed_printer_ids : [];
+        state.allowedPrinters = pids.length > 0 ? new Set(pids.map(Number)) : null;
         setDot('');
         const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!r.is_combined).length;
         document.title = pending > 0 ? `(${pending}) Staff Display` : 'Staff Display';

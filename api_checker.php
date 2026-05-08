@@ -486,14 +486,16 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '')
 function listActiveData($conn)
 {
     $overridePrintServerUrl = requestString('print_server_url', '');
-    $activeRows = fetchActiveRows($conn);
+    $activeRows      = fetchActiveRows($conn);
+    $allowedPrinters = fetchAllowedPrinterIds($conn, getEffectiveComputerId());
 
     jsonResponse(array(
-        'success' => true,
-        'generated_at' => date('Y-m-d H:i:s'),
-        'stats' => buildStats($activeRows, array()),
-        'active_rows' => $activeRows,
-        'filters' => buildFilterInfo($conn, $overridePrintServerUrl),
+        'success'             => true,
+        'generated_at'        => date('Y-m-d H:i:s'),
+        'stats'               => buildStats($activeRows, array()),
+        'active_rows'         => $activeRows,
+        'allowed_printer_ids' => $allowedPrinters,
+        'filters'             => buildFilterInfo($conn, $overridePrintServerUrl),
     ));
 }
 
