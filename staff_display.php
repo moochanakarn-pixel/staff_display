@@ -331,11 +331,12 @@ function renderGrid(){
         state.zoneTables.forEach(tid => {
             if(!seen.has(tid)) groups.push({key:tid,name:tid,pending:0,done:0,worst:0,isEmpty:true});
         });
-        groups.sort((a,b) => {
-            if(a.isEmpty !== b.isEmpty) return a.isEmpty ? 1 : -1;
-            return String(a.name).localeCompare(String(b.name),'th');
-        });
     }
+
+    groups.sort((a,b) => {
+        if(a.isEmpty !== b.isEmpty) return a.isEmpty ? 1 : -1;
+        return String(a.name).localeCompare(String(b.name), undefined, {numeric:true, sensitivity:'base'});
+    });
 
     if(!groups.length){
         wrap.innerHTML = '<div class="modal-msg" style="grid-column:1/-1">ไม่มีโต๊ะที่มีออเดอร์</div>';

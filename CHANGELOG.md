@@ -1,5 +1,13 @@
 # Changelog — Staff Display
 
+## [1.8.0] — 2026-05-08
+
+### เพิ่มใหม่ / แก้ไข
+- `renderGrid` — เรียงโต๊ะด้วย natural sort (`localeCompare {numeric:true}`) แทน lexicographic เดิม: "1","2","10","11" และ "B1","B2","B10" เรียงถูกต้อง
+- sort รันทุกครั้งไม่ว่า `state.zoneTables` จะ null หรือไม่ (เดิม sort ข้ามไปถ้าไม่มี zone data)
+
+---
+
 ## [1.7.0] — 2026-05-08
 
 ### แก้ไขบัค
