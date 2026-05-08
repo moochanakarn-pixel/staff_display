@@ -246,7 +246,7 @@ function esc(s){ return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&
 function fmtTime(v){
     if(!v) return '-';
     const d = new Date(String(v).replace(' ','T'));
-    return isNaN(d) ? String(v).slice(11,16)||String(v)
+    return isNaN(d) ? esc(String(v).slice(11,16)||String(v))
         : d.toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
 }
 function fmtQty(v){
@@ -258,11 +258,13 @@ function waitMin(row){
     return isNaN(d) ? 0 : Math.max(0,Math.floor((Date.now()-d)/60000));
 }
 function tKey(row){ return String(row.TableID || row.DisplayTableName || '-'); }
-function isNonKds(row){
-    if(!state.allowedPrinters || state.allowedPrinters.size === 0) return false;
-    const pid = parseInt(row.PrinterID, 10);
-    return pid > 0 && !state.allowedPrinters.has(pid);
+// row.PrinterID ไม่อยู่ใน printerSet → ไม่ใช่ station นี้ → auto-done
+// ถ้า set=null (ไม่ได้ config printer) → ไม่กรอง
+function nonKds(row, set){
+    if(!set || set.size === 0) return false;
+    return !row.is_voided && !set.has(parseInt(row.PrinterID, 10));
 }
+function isNonKds(row){ return nonKds(row, state.allowedPrinters); }
 function byZone(rows){
     if(!state.zoneTables) return safeArray(rows);
     return safeArray(rows).filter(r => state.zoneTables.has(tKey(r)));
@@ -345,9 +347,7 @@ function getOrderDate(key){
 }
 function buildRow(row, printerSet){
     const st       = parseInt(row.ProcessStatus, 10);
-    const pid      = parseInt(row.PrinterID, 10);
-    const autoDone = !row.is_voided && printerSet && printerSet.size > 0
-                     && pid > 0 && !printerSet.has(pid);
+    const autoDone = nonKds(row, printerSet);
     const done     = st === PS_DONE || autoDone;
     const voided   = !autoDone && st === PS_VOIDED;
     const cls    = done ? 'r-done' : voided ? 'r-voided' : 'r-active';
@@ -370,6 +370,10 @@ function buildRow(row, printerSet){
     </div>`;
 }
 function openModal(key, name){
+    if(_modalController) _modalController.abort();
+    _modalController = new AbortController();
+    const msig = _modalController.signal;
+
     document.getElementById('modalTitle').textContent = 'โต๊ะ ' + name;
     document.getElementById('modalSub').textContent   = '';
     document.getElementById('modalBody').innerHTML    = '<div class="modal-msg">กำลังโหลด...</div>';
@@ -380,23 +384,23 @@ function openModal(key, name){
     const txParam = txId > 0 ? '&transaction_id=' + txId : '';
     const od      = getOrderDate(key);
     const odParam = !txParam && od ? '&order_date=' + encodeURIComponent(od) : '';
-    fetch('api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + txParam + odParam + cidParam + '&_=' + Date.now(), {cache:'no-store'})
+    fetch('api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + txParam + odParam + cidParam + '&_=' + Date.now(), {cache:'no-store', signal:msig})
         .then(r => r.json())
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');
             const rows       = safeArray(json.rows);
             const pids       = Array.isArray(json.allowed_printer_ids) ? json.allowed_printer_ids : [];
             const printerSet = pids.length > 0 ? new Set(pids.map(Number)) : null;
-            const isAutoD    = r => { const pid=parseInt(r.PrinterID,10); return !r.is_voided&&printerSet&&printerSet.size>0&&pid>0&&!printerSet.has(pid); };
-            const nDone   = rows.filter(r => parseInt(r.ProcessStatus,10)===PS_DONE || isAutoD(r)).length;
-            const nActive = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return !isAutoD(r)&&s!==PS_DONE&&s!==PS_VOIDED; }).length;
-            const nVoid   = rows.filter(r => !isAutoD(r)&&parseInt(r.ProcessStatus,10)===PS_VOIDED).length;
+            const nDone   = rows.filter(r => parseInt(r.ProcessStatus,10)===PS_DONE || nonKds(r,printerSet)).length;
+            const nActive = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return !nonKds(r,printerSet)&&s!==PS_DONE&&s!==PS_VOIDED; }).length;
+            const nVoid   = rows.filter(r => !nonKds(r,printerSet)&&parseInt(r.ProcessStatus,10)===PS_VOIDED).length;
             document.getElementById('modalSub').textContent = `✅ เสร็จ ${nDone}  ·  🍳 กำลังทำ ${nActive}  ·  🚫 ยกเลิก ${nVoid}`;
             document.getElementById('modalBody').innerHTML  = rows.length
                 ? rows.map(r => buildRow(r, printerSet)).join('')
                 : '<div class="modal-msg">ไม่มีออเดอร์วันนี้</div>';
         })
         .catch(err => {
+            if(err.name === 'AbortError') return;
             document.getElementById('modalBody').innerHTML = '<div class="modal-msg">โหลดไม่สำเร็จ</div>';
             console.error(err);
         });
@@ -436,7 +440,8 @@ async function setZone(zid){
 
 /* ── Data ── */
 function setDot(s){ document.getElementById('statusDot').className='status-dot'+(s?' '+s:''); }
-let _loadController = null;
+let _loadController  = null;
+let _modalController = null;
 async function loadAll(){
     if(_loadController) _loadController.abort();
     _loadController = new AbortController();
@@ -455,7 +460,7 @@ async function loadAll(){
         const pids = Array.isArray(ar.allowed_printer_ids) ? ar.allowed_printer_ids : [];
         state.allowedPrinters = pids.length > 0 ? new Set(pids.map(Number)) : null;
         setDot('');
-        const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!r.is_combined).length;
+        const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!r.is_combined&&!isNonKds(r)).length;
         document.title = pending > 0 ? `(${pending}) Staff Display` : 'Staff Display';
         renderGrid();
     } catch(e){
