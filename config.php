@@ -196,3 +196,34 @@ function toDecimalString($number, $precision)
 {
     return number_format((float)$number, (int)$precision, '.', '');
 }
+
+function writeUsageLog($event, array $context = [])
+{
+    $logDir = __DIR__ . DIRECTORY_SEPARATOR . 'logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+
+    // ลบไฟล์เก่ากว่า 7 วัน
+    $files = glob($logDir . DIRECTORY_SEPARATOR . 'usage-*.log') ?: [];
+    $cutoff = strtotime('-7 days');
+    foreach ($files as $file) {
+        if (@filemtime($file) < $cutoff) {
+            @unlink($file);
+        }
+    }
+
+    $logFile = $logDir . DIRECTORY_SEPARATOR . 'usage-' . date('Y-m-d') . '.log';
+
+    $ip   = isset($_SERVER['HTTP_X_FORWARDED_FOR'])
+          ? explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]
+          : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '-');
+    $ip   = trim((string)$ip) ?: '-';
+
+    $parts = ['[' . date('Y-m-d H:i:s') . ']', $event, 'ip=' . $ip];
+    foreach ($context as $k => $v) {
+        $parts[] = $k . '=' . str_replace(["\r", "\n", ' '], ['', '', '_'], (string)$v);
+    }
+
+    @file_put_contents($logFile, implode(' ', $parts) . PHP_EOL, FILE_APPEND | LOCK_EX);
+}

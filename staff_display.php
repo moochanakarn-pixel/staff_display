@@ -1,4 +1,10 @@
-<?php require_once __DIR__ . '/config.php'; require_once __DIR__ . '/auth_check.php'; $machineDisplayName = function_exists('getMachineDisplayName') ? getMachineDisplayName() : ''; ?>
+<?php
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/auth_check.php';
+$machineDisplayName = function_exists('getMachineDisplayName') ? getMachineDisplayName() : '';
+$_pageCid = isset($_REQUEST['cid']) ? (int)$_REQUEST['cid'] : (int)CURRENT_COMPUTER_ID;
+writeUsageLog('PAGE_LOAD', ['cid' => $_pageCid]);
+?>
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -222,15 +228,17 @@ const T_YELLOW   = <?php echo (int)(defined('ALERT_THRESHOLD_YELLOW_DEFAULT') ? 
 const T_RED      = <?php echo (int)(defined('ALERT_THRESHOLD_RED_DEFAULT')    ? ALERT_THRESHOLD_RED_DEFAULT    : 20); ?>;
 const PAGE_CID   = <?php echo (int)(isset($_GET['cid']) && (int)$_GET['cid'] > 0 ? (int)$_GET['cid'] : 0); ?>;
 const cidParam   = PAGE_CID > 0 ? '&cid=' + PAGE_CID : '';
-const PS_DONE    = 1;
-const PS_VOIDED  = 98;
+const PS_DONE     = 1;
+const PS_RESOLVED = 4;
+const PS_VOIDED   = 98;
 
 const state = {
     active:   [],
     finished: [],
     zones:    [],
     zoneId:   null,
-    zoneTables: null   // Set<string> | null
+    zoneTables:      null,   // Set<string> | null
+    allowedPrinters: null,   // Set<number> | null (null = no filter)
 };
 
 /* ── Utilities ── */
@@ -239,7 +247,7 @@ function esc(s){ return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&
 function fmtTime(v){
     if(!v) return '-';
     const d = new Date(String(v).replace(' ','T'));
-    return isNaN(d) ? String(v).slice(11,16)||String(v)
+    return isNaN(d) ? esc(String(v).slice(11,16)||String(v))
         : d.toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
 }
 function fmtQty(v){
@@ -251,9 +259,21 @@ function waitMin(row){
     return isNaN(d) ? 0 : Math.max(0,Math.floor((Date.now()-d)/60000));
 }
 function tKey(row){ return String(row.TableID || row.DisplayTableName || '-'); }
+// สำหรับ order ย้ายโต๊ะ: ถ้า TableID ว่าง ให้ใช้ moved_to (ปลายทาง) แทน DisplayTableName "2->4"
+function tKeyEff(row){
+    if(!row.TableID && row.is_moved && row.moved_to) return String(row.moved_to);
+    return tKey(row);
+}
+// row.PrinterID ไม่อยู่ใน printerSet → ไม่ใช่ station นี้ → auto-done
+// ถ้า set=null (ไม่ได้ config printer) → ไม่กรอง
+function nonKds(row, set){
+    if(!set || set.size === 0) return false;
+    return !row.is_voided && !set.has(parseInt(row.PrinterID, 10));
+}
+function isNonKds(row){ return nonKds(row, state.allowedPrinters); }
 function byZone(rows){
     if(!state.zoneTables) return safeArray(rows);
-    return safeArray(rows).filter(r => state.zoneTables.has(tKey(r)));
+    return safeArray(rows).filter(r => state.zoneTables.has(tKeyEff(r)));
 }
 
 /* ── Group rows by table → card data ── */
@@ -264,14 +284,18 @@ function groupTables(active, finished){
         return map.get(key);
     }
     safeArray(active).forEach(r => {
-        const g = get(tKey(r), r.DisplayTableName || r.TableID || '-');
-        if(!r.is_voided && !r.is_moved && !r.is_combined){
+        const key  = tKeyEff(r);
+        const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
+        const g    = get(key, name);
+        if(!r.is_voided && !r.is_combined && !isNonKds(r)){
             g.pending++;
             g.worst = Math.max(g.worst, waitMin(r));
         }
     });
     safeArray(finished).forEach(r => {
-        get(tKey(r), r.DisplayTableName || r.TableID || '-').done++;
+        const key  = tKeyEff(r);
+        const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
+        get(key, name).done++;
     });
     return Array.from(map.values());
 }
@@ -307,11 +331,12 @@ function renderGrid(){
         state.zoneTables.forEach(tid => {
             if(!seen.has(tid)) groups.push({key:tid,name:tid,pending:0,done:0,worst:0,isEmpty:true});
         });
-        groups.sort((a,b) => {
-            if(a.isEmpty !== b.isEmpty) return a.isEmpty ? 1 : -1;
-            return String(a.name).localeCompare(String(b.name),'th');
-        });
     }
+
+    groups.sort((a,b) => {
+        if(a.isEmpty !== b.isEmpty) return a.isEmpty ? 1 : -1;
+        return String(a.name).localeCompare(String(b.name), undefined, {numeric:true, sensitivity:'base'});
+    });
 
     if(!groups.length){
         wrap.innerHTML = '<div class="modal-msg" style="grid-column:1/-1">ไม่มีโต๊ะที่มีออเดอร์</div>';
@@ -322,15 +347,22 @@ function renderGrid(){
 
 /* ── Modal ── */
 function getTransactionId(key){
-    const row = safeArray(state.active).find(r => tKey(r) === key)
-             || safeArray(state.finished).find(r => tKey(r) === key);
+    const row = safeArray(state.active).find(r => tKeyEff(r) === key)
+             || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.TransactionID ? parseInt(row.TransactionID, 10) : 0;
 }
-function buildRow(row){
-    const st   = parseInt(row.ProcessStatus, 10);
-    const done = st === PS_DONE, voided = st === PS_VOIDED;
-    const cls  = done ? 'r-done' : voided ? 'r-voided' : 'r-active';
-    const lbl  = done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
+function getOrderDate(key){
+    const row = safeArray(state.active).find(r => tKeyEff(r) === key)
+             || safeArray(state.finished).find(r => tKeyEff(r) === key);
+    return row && row.OrderDate ? String(row.OrderDate).slice(0,10) : '';
+}
+function buildRow(row, printerSet){
+    const st       = parseInt(row.ProcessStatus, 10);
+    const autoDone = nonKds(row, printerSet);
+    const done     = st === PS_DONE || st === PS_RESOLVED || autoDone;
+    const voided   = !autoDone && st === PS_VOIDED;
+    const cls    = done ? 'r-done' : voided ? 'r-voided' : 'r-active';
+    const lbl    = done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
     const name = row.parent_name
         ? `${esc(row.parent_name)} · ${esc(row.ProductName||'-')}`
         : esc(row.ProductName||'-');
@@ -349,28 +381,37 @@ function buildRow(row){
     </div>`;
 }
 function openModal(key, name){
+    if(_modalController) _modalController.abort();
+    _modalController = new AbortController();
+    const msig = _modalController.signal;
+
     document.getElementById('modalTitle').textContent = 'โต๊ะ ' + name;
     document.getElementById('modalSub').textContent   = '';
     document.getElementById('modalBody').innerHTML    = '<div class="modal-msg">กำลังโหลด...</div>';
     document.getElementById('tableModal').classList.add('open');
     document.body.style.overflow = 'hidden';
 
-    const txId   = getTransactionId(key);
+    const txId    = getTransactionId(key);
     const txParam = txId > 0 ? '&transaction_id=' + txId : '';
-    fetch('api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + txParam + cidParam + '&_=' + Date.now(), {cache:'no-store'})
+    const od      = getOrderDate(key);
+    const odParam = !txParam && od ? '&order_date=' + encodeURIComponent(od) : '';
+    fetch('api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + txParam + odParam + cidParam + '&_=' + Date.now(), {cache:'no-store', signal:msig})
         .then(r => r.json())
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');
-            const rows    = safeArray(json.rows);
-            const nDone   = rows.filter(r => parseInt(r.ProcessStatus,10) === PS_DONE).length;
-            const nActive = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return s!==PS_DONE&&s!==PS_VOIDED; }).length;
-            const nVoid   = rows.filter(r => parseInt(r.ProcessStatus,10) === PS_VOIDED).length;
+            const rows       = safeArray(json.rows);
+            const pids       = Array.isArray(json.allowed_printer_ids) ? json.allowed_printer_ids : [];
+            const printerSet = pids.length > 0 ? new Set(pids.map(Number)) : null;
+            const nDone   = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return s===PS_DONE||s===PS_RESOLVED||nonKds(r,printerSet); }).length;
+            const nActive = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return !nonKds(r,printerSet)&&s!==PS_DONE&&s!==PS_RESOLVED&&s!==PS_VOIDED; }).length;
+            const nVoid   = rows.filter(r => !nonKds(r,printerSet)&&parseInt(r.ProcessStatus,10)===PS_VOIDED).length;
             document.getElementById('modalSub').textContent = `✅ เสร็จ ${nDone}  ·  🍳 กำลังทำ ${nActive}  ·  🚫 ยกเลิก ${nVoid}`;
             document.getElementById('modalBody').innerHTML  = rows.length
-                ? rows.map(buildRow).join('')
+                ? rows.map(r => buildRow(r, printerSet)).join('')
                 : '<div class="modal-msg">ไม่มีออเดอร์วันนี้</div>';
         })
         .catch(err => {
+            if(err.name === 'AbortError') return;
             document.getElementById('modalBody').innerHTML = '<div class="modal-msg">โหลดไม่สำเร็จ</div>';
             console.error(err);
         });
@@ -410,7 +451,8 @@ async function setZone(zid){
 
 /* ── Data ── */
 function setDot(s){ document.getElementById('statusDot').className='status-dot'+(s?' '+s:''); }
-let _loadController = null;
+let _loadController  = null;
+let _modalController = null;
 async function loadAll(){
     if(_loadController) _loadController.abort();
     _loadController = new AbortController();
@@ -426,8 +468,10 @@ async function loadAll(){
         if(!fr.success) throw new Error(fr.error);
         state.active   = safeArray(ar.active_rows);
         state.finished = safeArray(fr.recent_finished_rows);
+        const pids = Array.isArray(ar.allowed_printer_ids) ? ar.allowed_printer_ids : [];
+        state.allowedPrinters = pids.length > 0 ? new Set(pids.map(Number)) : null;
         setDot('');
-        const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!r.is_combined).length;
+        const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!r.is_combined&&!isNonKds(r)).length;
         document.title = pending > 0 ? `(${pending}) Staff Display` : 'Staff Display';
         renderGrid();
     } catch(e){

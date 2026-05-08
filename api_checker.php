@@ -358,6 +358,7 @@ try {
         'error' => 'Unknown action',
     ), 400);
 } catch (Throwable $e) {
+    writeUsageLog('ERROR', ['action' => $action ?? '-', 'msg' => substr($e->getMessage(), 0, 200)]);
     jsonResponse(array(
         'success' => false,
         'error' => $e->getMessage(),
@@ -415,20 +416,25 @@ function listTableOrders($conn)
 {
     $tableId       = requestString('table_id', '');
     $transactionId = requestInt('transaction_id', 0);
+    $orderDate     = requestString('order_date', '');
     if ($tableId === '') {
         jsonResponse(array('success' => false, 'error' => 'table_id required'));
         return;
     }
-    $rows = fetchTableOrders($conn, $tableId, $transactionId);
+    $cid = getEffectiveComputerId();
+    writeUsageLog('TABLE_OPEN', ['table_id' => $tableId, 'cid' => $cid]);
+    $rows            = fetchTableOrders($conn, $tableId, $transactionId, $orderDate);
+    $allowedPrinters = fetchAllowedPrinterIds($conn, $cid);
     jsonResponse(array(
-        'success'      => true,
-        'generated_at' => date('Y-m-d H:i:s'),
-        'table_id'     => $tableId,
-        'rows'         => $rows,
+        'success'             => true,
+        'generated_at'        => date('Y-m-d H:i:s'),
+        'table_id'            => $tableId,
+        'allowed_printer_ids' => $allowedPrinters,
+        'rows'                => $rows,
     ));
 }
 
-function fetchTableOrders($conn, $tableId, $transactionId = 0)
+function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '')
 {
     $selectCols = "
             opf.ProcessID,
@@ -436,6 +442,8 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0)
             opf.TransactionID,
             opf.ComputerID,
             opf.OrderDetailID,
+            opf.PrinterID,
+            opf.IsMoveOrder,
             opf.ProductID,
             opf.ProductName,
             opf.ProductAmount,
@@ -458,8 +466,13 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0)
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
         $stmt->bind_param('si', $tableId, $transactionId);
+    } elseif ($orderDate !== '') {
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = ? $order";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return array();
+        $stmt->bind_param('ss', $tableId, $orderDate);
     } else {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.SubmitOrderDateTime >= DATE_SUB(NOW(), INTERVAL 24 HOUR) $order";
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = CURDATE() $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
         $stmt->bind_param('s', $tableId);
@@ -478,14 +491,16 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0)
 function listActiveData($conn)
 {
     $overridePrintServerUrl = requestString('print_server_url', '');
-    $activeRows = fetchActiveRows($conn);
+    $activeRows      = fetchActiveRows($conn);
+    $allowedPrinters = fetchAllowedPrinterIds($conn, getEffectiveComputerId());
 
     jsonResponse(array(
-        'success' => true,
-        'generated_at' => date('Y-m-d H:i:s'),
-        'stats' => buildStats($activeRows, array()),
-        'active_rows' => $activeRows,
-        'filters' => buildFilterInfo($conn, $overridePrintServerUrl),
+        'success'             => true,
+        'generated_at'        => date('Y-m-d H:i:s'),
+        'stats'               => buildStats($activeRows, array()),
+        'active_rows'         => $activeRows,
+        'allowed_printer_ids' => $allowedPrinters,
+        'filters'             => buildFilterInfo($conn, $overridePrintServerUrl),
     ));
 }
 
