@@ -421,13 +421,16 @@ function listTableOrders($conn)
         jsonResponse(array('success' => false, 'error' => 'table_id required'));
         return;
     }
-    writeUsageLog('TABLE_OPEN', ['table_id' => $tableId, 'cid' => getEffectiveComputerId()]);
-    $rows = fetchTableOrders($conn, $tableId, $transactionId, $orderDate);
+    $cid = getEffectiveComputerId();
+    writeUsageLog('TABLE_OPEN', ['table_id' => $tableId, 'cid' => $cid]);
+    $rows            = fetchTableOrders($conn, $tableId, $transactionId, $orderDate);
+    $allowedPrinters = fetchAllowedPrinterIds($conn, $cid);
     jsonResponse(array(
-        'success'      => true,
-        'generated_at' => date('Y-m-d H:i:s'),
-        'table_id'     => $tableId,
-        'rows'         => $rows,
+        'success'             => true,
+        'generated_at'        => date('Y-m-d H:i:s'),
+        'table_id'            => $tableId,
+        'allowed_printer_ids' => $allowedPrinters,
+        'rows'                => $rows,
     ));
 }
 

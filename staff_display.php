@@ -343,11 +343,13 @@ function getOrderDate(key){
              || safeArray(state.finished).find(r => tKey(r) === key);
     return row && row.OrderDate ? String(row.OrderDate).slice(0,10) : '';
 }
-function buildRow(row){
-    const st     = parseInt(row.ProcessStatus, 10);
-    const autoDone = !row.is_voided && isNonKds(row);
-    const done   = st === PS_DONE || autoDone;
-    const voided = !autoDone && st === PS_VOIDED;
+function buildRow(row, printerSet){
+    const st       = parseInt(row.ProcessStatus, 10);
+    const pid      = parseInt(row.PrinterID, 10);
+    const autoDone = !row.is_voided && printerSet && printerSet.size > 0
+                     && pid > 0 && !printerSet.has(pid);
+    const done     = st === PS_DONE || autoDone;
+    const voided   = !autoDone && st === PS_VOIDED;
     const cls    = done ? 'r-done' : voided ? 'r-voided' : 'r-active';
     const lbl    = done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
     const name = row.parent_name
@@ -382,13 +384,16 @@ function openModal(key, name){
         .then(r => r.json())
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');
-            const rows    = safeArray(json.rows);
-            const nDone   = rows.filter(r => parseInt(r.ProcessStatus,10) === PS_DONE).length;
-            const nActive = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return s!==PS_DONE&&s!==PS_VOIDED; }).length;
-            const nVoid   = rows.filter(r => parseInt(r.ProcessStatus,10) === PS_VOIDED).length;
+            const rows       = safeArray(json.rows);
+            const pids       = Array.isArray(json.allowed_printer_ids) ? json.allowed_printer_ids : [];
+            const printerSet = pids.length > 0 ? new Set(pids.map(Number)) : null;
+            const isAutoD    = r => { const pid=parseInt(r.PrinterID,10); return !r.is_voided&&printerSet&&printerSet.size>0&&pid>0&&!printerSet.has(pid); };
+            const nDone   = rows.filter(r => parseInt(r.ProcessStatus,10)===PS_DONE || isAutoD(r)).length;
+            const nActive = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return !isAutoD(r)&&s!==PS_DONE&&s!==PS_VOIDED; }).length;
+            const nVoid   = rows.filter(r => !isAutoD(r)&&parseInt(r.ProcessStatus,10)===PS_VOIDED).length;
             document.getElementById('modalSub').textContent = `✅ เสร็จ ${nDone}  ·  🍳 กำลังทำ ${nActive}  ·  🚫 ยกเลิก ${nVoid}`;
             document.getElementById('modalBody').innerHTML  = rows.length
-                ? rows.map(buildRow).join('')
+                ? rows.map(r => buildRow(r, printerSet)).join('')
                 : '<div class="modal-msg">ไม่มีออเดอร์วันนี้</div>';
         })
         .catch(err => {
