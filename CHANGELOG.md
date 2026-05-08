@@ -1,5 +1,14 @@
 # Changelog — Staff Display
 
+## [1.7.0] — 2026-05-08
+
+### แก้ไขบัค
+- `PS_RESOLVED = 4` — เพิ่ม ProcessStatus=4 (Resolved) เป็นสถานะ "เสร็จแล้ว" ใน JS แก้ปัญหา item ที่ถูก resolve ใน POS แสดงเป็น "กำลังทำ" แทน
+- `buildRow` — ยกเลิก logic พิเศษสำหรับ `is_moved` ที่ทำให้รายการที่ย้ายโต๊ะแสดงเป็นสีเทา "🔄 ย้ายโต๊ะ" — ตอนนี้แสดงสถานะปกติ (กำลังทำ/เสร็จแล้ว)
+- Modal summary counters — ลบ `!r.is_moved` filter ออก และเพิ่ม `PS_RESOLVED` ในการนับ nDone/nActive
+
+---
+
 ## [1.6.0] — 2026-05-08
 
 ### แก้ไขบัค

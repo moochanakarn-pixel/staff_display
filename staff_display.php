@@ -228,8 +228,9 @@ const T_YELLOW   = <?php echo (int)(defined('ALERT_THRESHOLD_YELLOW_DEFAULT') ? 
 const T_RED      = <?php echo (int)(defined('ALERT_THRESHOLD_RED_DEFAULT')    ? ALERT_THRESHOLD_RED_DEFAULT    : 20); ?>;
 const PAGE_CID   = <?php echo (int)(isset($_GET['cid']) && (int)$_GET['cid'] > 0 ? (int)$_GET['cid'] : 0); ?>;
 const cidParam   = PAGE_CID > 0 ? '&cid=' + PAGE_CID : '';
-const PS_DONE    = 1;
-const PS_VOIDED  = 98;
+const PS_DONE     = 1;
+const PS_RESOLVED = 4;
+const PS_VOIDED   = 98;
 
 const state = {
     active:   [],
@@ -357,11 +358,10 @@ function getOrderDate(key){
 function buildRow(row, printerSet){
     const st       = parseInt(row.ProcessStatus, 10);
     const autoDone = nonKds(row, printerSet);
-    const moved    = !!row.is_moved;
-    const done     = st === PS_DONE || autoDone;
-    const voided   = !autoDone && !moved && st === PS_VOIDED;
-    const cls    = moved ? 'r-voided' : done ? 'r-done' : voided ? 'r-voided' : 'r-active';
-    const lbl    = moved ? `🔄 ย้ายโต๊ะ → ${esc(row.moved_to||'')}` : done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
+    const done     = st === PS_DONE || st === PS_RESOLVED || autoDone;
+    const voided   = !autoDone && st === PS_VOIDED;
+    const cls    = done ? 'r-done' : voided ? 'r-voided' : 'r-active';
+    const lbl    = done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
     const name = row.parent_name
         ? `${esc(row.parent_name)} · ${esc(row.ProductName||'-')}`
         : esc(row.ProductName||'-');
@@ -401,9 +401,9 @@ function openModal(key, name){
             const rows       = safeArray(json.rows);
             const pids       = Array.isArray(json.allowed_printer_ids) ? json.allowed_printer_ids : [];
             const printerSet = pids.length > 0 ? new Set(pids.map(Number)) : null;
-            const nDone   = rows.filter(r => !r.is_moved&&(parseInt(r.ProcessStatus,10)===PS_DONE||nonKds(r,printerSet))).length;
-            const nActive = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return !r.is_moved&&!nonKds(r,printerSet)&&s!==PS_DONE&&s!==PS_VOIDED; }).length;
-            const nVoid   = rows.filter(r => !r.is_moved&&!nonKds(r,printerSet)&&parseInt(r.ProcessStatus,10)===PS_VOIDED).length;
+            const nDone   = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return s===PS_DONE||s===PS_RESOLVED||nonKds(r,printerSet); }).length;
+            const nActive = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return !nonKds(r,printerSet)&&s!==PS_DONE&&s!==PS_RESOLVED&&s!==PS_VOIDED; }).length;
+            const nVoid   = rows.filter(r => !nonKds(r,printerSet)&&parseInt(r.ProcessStatus,10)===PS_VOIDED).length;
             document.getElementById('modalSub').textContent = `✅ เสร็จ ${nDone}  ·  🍳 กำลังทำ ${nActive}  ·  🚫 ยกเลิก ${nVoid}`;
             document.getElementById('modalBody').innerHTML  = rows.length
                 ? rows.map(r => buildRow(r, printerSet)).join('')
