@@ -358,6 +358,7 @@ try {
         'error' => 'Unknown action',
     ), 400);
 } catch (Throwable $e) {
+    writeUsageLog('ERROR', ['action' => $action ?? '-', 'msg' => substr($e->getMessage(), 0, 200)]);
     jsonResponse(array(
         'success' => false,
         'error' => $e->getMessage(),
@@ -420,6 +421,7 @@ function listTableOrders($conn)
         jsonResponse(array('success' => false, 'error' => 'table_id required'));
         return;
     }
+    writeUsageLog('TABLE_OPEN', ['table_id' => $tableId, 'cid' => getEffectiveComputerId()]);
     $rows = fetchTableOrders($conn, $tableId, $transactionId, $orderDate);
     jsonResponse(array(
         'success'      => true,

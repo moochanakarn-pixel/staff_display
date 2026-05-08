@@ -1,4 +1,10 @@
-<?php require_once __DIR__ . '/config.php'; require_once __DIR__ . '/auth_check.php'; $machineDisplayName = function_exists('getMachineDisplayName') ? getMachineDisplayName() : ''; ?>
+<?php
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/auth_check.php';
+$machineDisplayName = function_exists('getMachineDisplayName') ? getMachineDisplayName() : '';
+$_pageCid = isset($_REQUEST['cid']) ? (int)$_REQUEST['cid'] : (int)CURRENT_COMPUTER_ID;
+writeUsageLog('PAGE_LOAD', ['cid' => $_pageCid]);
+?>
 <!DOCTYPE html>
 <html lang="th">
 <head>

@@ -1,5 +1,17 @@
 # Changelog — Staff Display
 
+## [1.4.0] — 2026-05-08
+
+### เพิ่มใหม่
+- Usage log รายวัน (`logs/usage-YYYY-MM-DD.log`) เก็บอัตโนมัติ 7 วัน
+  - `PAGE_LOAD` — พนักงานเปิดหน้า staff_display (บันทึก cid + IP)
+  - `TABLE_OPEN` — กดเข้าดูโต๊ะ (บันทึก table_id + cid + IP)
+  - `ERROR` — exception ที่เกิดใน api_checker (บันทึก action + error message)
+- `logs/web.config` — บล็อก IIS ไม่ให้เข้าถึงไฟล์ .log โดยตรง
+- `.gitignore` — ไม่ commit log file และ settings.local.php
+
+---
+
 ## [1.3.0] — 2026-05-08
 
 ### แก้ไข
