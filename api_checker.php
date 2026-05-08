@@ -443,6 +443,7 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '')
             opf.ComputerID,
             opf.OrderDetailID,
             opf.PrinterID,
+            opf.IsMoveOrder,
             opf.ProductID,
             opf.ProductName,
             opf.ProductAmount,
