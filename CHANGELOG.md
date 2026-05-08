@@ -1,5 +1,13 @@
 # Changelog — Staff Display
 
+## [1.3.0] — 2026-05-08
+
+### แก้ไข
+- `web.config`: เพิ่ม `existingResponse="PassThrough"` — ป้องกัน IIS แทนที่ JSON error ของ PHP ด้วย HTML 500 ของตัวเอง
+- `api_checker.php` (`fetchTableOrders`): เปลี่ยน fallback filter จาก `SubmitOrderDateTime >= NOW() - 24h` เป็น `OrderDate = CURDATE()` — สอดคล้องกับ `fetchActiveRows` และรองรับระบบ POS ที่ไม่ populate TransactionID
+
+---
+
 ## [1.2.0] — 2026-05-02
 
 ### เพิ่มใหม่

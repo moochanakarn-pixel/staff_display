@@ -459,7 +459,7 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0)
         if (!$stmt) return array();
         $stmt->bind_param('si', $tableId, $transactionId);
     } else {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.SubmitOrderDateTime >= DATE_SUB(NOW(), INTERVAL 24 HOUR) $order";
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = CURDATE() $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
         $stmt->bind_param('s', $tableId);
