@@ -258,6 +258,11 @@ function waitMin(row){
     return isNaN(d) ? 0 : Math.max(0,Math.floor((Date.now()-d)/60000));
 }
 function tKey(row){ return String(row.TableID || row.DisplayTableName || '-'); }
+// สำหรับ order ย้ายโต๊ะ: ถ้า TableID ว่าง ให้ใช้ moved_to (ปลายทาง) แทน DisplayTableName "2->4"
+function tKeyEff(row){
+    if(!row.TableID && row.is_moved && row.moved_to) return String(row.moved_to);
+    return tKey(row);
+}
 // row.PrinterID ไม่อยู่ใน printerSet → ไม่ใช่ station นี้ → auto-done
 // ถ้า set=null (ไม่ได้ config printer) → ไม่กรอง
 function nonKds(row, set){
@@ -267,7 +272,7 @@ function nonKds(row, set){
 function isNonKds(row){ return nonKds(row, state.allowedPrinters); }
 function byZone(rows){
     if(!state.zoneTables) return safeArray(rows);
-    return safeArray(rows).filter(r => state.zoneTables.has(tKey(r)));
+    return safeArray(rows).filter(r => state.zoneTables.has(tKeyEff(r)));
 }
 
 /* ── Group rows by table → card data ── */
@@ -278,14 +283,18 @@ function groupTables(active, finished){
         return map.get(key);
     }
     safeArray(active).forEach(r => {
-        const g = get(tKey(r), r.DisplayTableName || r.TableID || '-');
-        if(!r.is_voided && !r.is_moved && !r.is_combined && !isNonKds(r)){
+        const key  = tKeyEff(r);
+        const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
+        const g    = get(key, name);
+        if(!r.is_voided && !r.is_combined && !isNonKds(r)){
             g.pending++;
             g.worst = Math.max(g.worst, waitMin(r));
         }
     });
     safeArray(finished).forEach(r => {
-        get(tKey(r), r.DisplayTableName || r.TableID || '-').done++;
+        const key  = tKeyEff(r);
+        const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
+        get(key, name).done++;
     });
     return Array.from(map.values());
 }
@@ -336,13 +345,13 @@ function renderGrid(){
 
 /* ── Modal ── */
 function getTransactionId(key){
-    const row = safeArray(state.active).find(r => tKey(r) === key)
-             || safeArray(state.finished).find(r => tKey(r) === key);
+    const row = safeArray(state.active).find(r => tKeyEff(r) === key)
+             || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.TransactionID ? parseInt(row.TransactionID, 10) : 0;
 }
 function getOrderDate(key){
-    const row = safeArray(state.active).find(r => tKey(r) === key)
-             || safeArray(state.finished).find(r => tKey(r) === key);
+    const row = safeArray(state.active).find(r => tKeyEff(r) === key)
+             || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.OrderDate ? String(row.OrderDate).slice(0,10) : '';
 }
 function buildRow(row, printerSet){
