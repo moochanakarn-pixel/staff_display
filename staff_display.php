@@ -237,7 +237,7 @@ const state = {
     finished: [],
     zones:    [],
     zoneId:   null,
-    zoneTables:      null,   // Set<string> | null
+    zoneTables:      null,   // Map<string,string> (TableID→TableName) | null
     allowedPrinters: null,   // Set<number> | null (null = no filter)
 };
 
@@ -328,8 +328,8 @@ function renderGrid(){
     const seen   = new Set(groups.map(g => g.key));
 
     if(state.zoneTables){
-        state.zoneTables.forEach(tid => {
-            if(!seen.has(tid)) groups.push({key:tid,name:tid,pending:0,done:0,worst:0,isEmpty:true});
+        state.zoneTables.forEach((tname, tid) => {
+            if(!seen.has(tid)) groups.push({key:tid,name:tname,pending:0,done:0,worst:0,isEmpty:true});
         });
     }
 
@@ -441,7 +441,7 @@ async function setZone(zid){
         try {
             const res  = await fetch('api_checker.php?action=list_tables_in_zone&zone_id='+encodeURIComponent(zid)+cidParam+'&_='+Date.now(),{cache:'no-store'});
             const json = await res.json();
-            state.zoneTables = json.success ? new Set(safeArray(json.tables).map(t=>String(t.TableID))) : null;
+            state.zoneTables = json.success ? new Map(safeArray(json.tables).map(t=>[String(t.TableID), String(t.TableName||t.TableID)])) : null;
         } catch(e){ state.zoneTables=null; }
     } else {
         state.zoneTables = null;

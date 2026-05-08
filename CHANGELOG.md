@@ -1,5 +1,15 @@
 # Changelog — Staff Display
 
+## [1.9.0] — 2026-05-08
+
+### เพิ่มใหม่
+- โต๊ะว่าง (empty card) แสดงชื่อโต๊ะจริง (TableName) แทนที่จะเป็น TableID
+  - `list_tables_in_zone` คืน `TableName` เพิ่มเติมจาก `TableID`
+  - `state.zoneTables` เปลี่ยนจาก `Set<id>` เป็น `Map<id→name>`
+  - empty card loop ใช้ชื่อโต๊ะจาก Map แทน raw ID
+
+---
+
 ## [1.8.0] — 2026-05-08
 
 ### เพิ่มใหม่ / แก้ไข

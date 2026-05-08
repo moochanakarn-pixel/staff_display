@@ -395,7 +395,7 @@ function listTablesInZone($conn)
         return;
     }
     $stmt = $conn->prepare(
-        "SELECT TableID FROM tableno WHERE ZoneID = ? AND (Deleted = 0 OR Deleted IS NULL) ORDER BY TableID ASC LIMIT 500"
+        "SELECT TableID, TableName FROM tableno WHERE ZoneID = ? AND (Deleted = 0 OR Deleted IS NULL) ORDER BY TableID ASC LIMIT 500"
     );
     if (!$stmt) {
         jsonResponse(array('success' => false, 'error' => $conn->error));
@@ -406,7 +406,7 @@ function listTablesInZone($conn)
     $result = $stmt->get_result();
     $tables = array();
     while ($row = $result->fetch_assoc()) {
-        $tables[] = array('TableID' => $row['TableID']);
+        $tables[] = array('TableID' => $row['TableID'], 'TableName' => (string)$row['TableName']);
     }
     $stmt->close();
     jsonResponse(array('success' => true, 'zone_id' => $zoneId, 'tables' => $tables));
