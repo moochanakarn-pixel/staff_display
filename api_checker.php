@@ -415,11 +415,12 @@ function listTableOrders($conn)
 {
     $tableId       = requestString('table_id', '');
     $transactionId = requestInt('transaction_id', 0);
+    $orderDate     = requestString('order_date', '');
     if ($tableId === '') {
         jsonResponse(array('success' => false, 'error' => 'table_id required'));
         return;
     }
-    $rows = fetchTableOrders($conn, $tableId, $transactionId);
+    $rows = fetchTableOrders($conn, $tableId, $transactionId, $orderDate);
     jsonResponse(array(
         'success'      => true,
         'generated_at' => date('Y-m-d H:i:s'),
@@ -428,7 +429,7 @@ function listTableOrders($conn)
     ));
 }
 
-function fetchTableOrders($conn, $tableId, $transactionId = 0)
+function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '')
 {
     $selectCols = "
             opf.ProcessID,
@@ -458,6 +459,11 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0)
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
         $stmt->bind_param('si', $tableId, $transactionId);
+    } elseif ($orderDate !== '') {
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = ? $order";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return array();
+        $stmt->bind_param('ss', $tableId, $orderDate);
     } else {
         $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = CURDATE() $order";
         $stmt = $conn->prepare($sql);
