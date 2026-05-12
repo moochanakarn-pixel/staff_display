@@ -194,6 +194,10 @@ writeUsageLog('SERVE_PAGE_LOAD');
 <script>
 const REFRESH_MS = <?php echo max(5000,(int)APP_REFRESH_MS); ?>;
 
+const PS_DONE     = <?php echo (int)PROCESS_STATUS_FINISHED; ?>;
+const PS_RESOLVED = <?php echo (int)PROCESS_STATUS_RESOLVED; ?>;
+const PS_VOIDED   = <?php echo (int)PROCESS_STATUS_VOIDED; ?>;
+
 const state = { tables: [] };
 let _timer = null;
 let _modalController = null;
@@ -292,9 +296,9 @@ function openModal(key, name, txId, orderDate){
         .then(r => r.json())
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');
-            const rows    = safeArray(json.rows).filter(r => parseInt(r.ProcessStatus,10) !== 98);
-            const nReady  = rows.filter(r => {const s=parseInt(r.ProcessStatus,10); return (s===1||s===4) && !r.ServingDateTime;}).length;
-            const nCook   = rows.filter(r => {const s=parseInt(r.ProcessStatus,10); return s===0||s===2;}).length;
+            const rows    = safeArray(json.rows).filter(r => parseInt(r.ProcessStatus,10) !== PS_VOIDED);
+            const nReady  = rows.filter(r => {const s=parseInt(r.ProcessStatus,10); return (s===PS_DONE||s===PS_RESOLVED) && !r.ServingDateTime;}).length;
+            const nCook   = rows.filter(r => {const s=parseInt(r.ProcessStatus,10); return s!==PS_DONE&&s!==PS_RESOLVED&&s!==PS_VOIDED;}).length;
             const nServed = rows.filter(r => !!r.ServingDateTime).length;
             document.getElementById('modalSub').textContent =
                 `✅ พร้อมเสิร์ฟ ${nReady}  ·  🍳 ทำอยู่ ${nCook}  ·  🚚 เสิร์ฟแล้ว ${nServed}`;
@@ -311,8 +315,8 @@ function openModal(key, name, txId, orderDate){
 function buildRow(row){
     const st     = parseInt(row.ProcessStatus, 10);
     const served = !!row.ServingDateTime;
-    const isDone = st === 1 || st === 4;
-    const isCook = st === 0 || st === 2;
+    const isDone = st === PS_DONE || st === PS_RESOLVED;
+    const isCook = !isDone && st !== PS_VOIDED;
 
     let cls, lbl;
     if(served){
@@ -325,11 +329,12 @@ function buildRow(row){
         cls = 'r-voided'; lbl = '🚫 ยกเลิก';
     }
 
-    const name = row.parent_name
+    const name = row.parent_name && String(row.parent_name).trim()
         ? `${esc(row.parent_name)} · ${esc(row.ProductName||'-')}`
         : esc(row.ProductName||'-');
 
-    const time = isDone && row.FinishDateTime
+    const finishOk = isDone && row.FinishDateTime && row.FinishDateTime !== '0000-00-00 00:00:00';
+    const time = finishOk
         ? `ส่ง ${esc(fmtTime(row.SubmitOrderDateTime))} · เสร็จ ${esc(fmtTime(row.FinishDateTime))}`
         : `ส่ง ${esc(fmtTime(row.SubmitOrderDateTime))}`;
 

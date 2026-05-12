@@ -675,7 +675,7 @@ function fetchServeTableOrders($conn, $tableId, $transactionId = 0, $orderDate =
         $rows[] = $row;
     }
     $stmt->close();
-    return $rows;
+    return attachCommentsToRows($conn, $rows);
 }
 
 function buildFilterInfo($conn = null, $overridePrintServerUrl = '')
