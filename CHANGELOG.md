@@ -1,5 +1,20 @@
 # Changelog — Staff Display
 
+## [2.0.0] — 2026-05-12
+
+### เพิ่มใหม่
+- `?mode=serve` — รวม Serve Display เข้า `staff_display.php` ในหน้าเดียว
+  - `staff_display.php` → KDS mode (เดิม)
+  - `staff_display.php?mode=serve` → Serve mode สำหรับพนักงานเสิร์ฟ
+  - topbar เปลี่ยนสีเป็น teal, body class `serve-mode` override card colours
+  - card สีเขียว+pulse = พร้อมเสิร์ฟทั้งหมด, สีส้ม = ยังมีรายการทำอยู่
+  - เรียงโต๊ะพร้อมเสิร์ฟขึ้นก่อน ตามด้วย natural sort
+  - modal แสดง status ต่อรายการ: กำลังทำ / พร้อมเสิร์ฟ / เสิร์ฟแล้ว
+  - title bar `(N) Serve Display` นับโต๊ะที่พร้อมเสิร์ฟทั้งหมด
+- ลบ `serve_display.php` ออก (รวมเข้า staff_display แล้ว)
+
+---
+
 ## [1.9.0] — 2026-05-12
 
 ### เพิ่มใหม่

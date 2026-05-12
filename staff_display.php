@@ -2,19 +2,21 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth_check.php';
 $machineDisplayName = function_exists('getMachineDisplayName') ? getMachineDisplayName() : '';
-$_pageCid = isset($_REQUEST['cid']) ? (int)$_REQUEST['cid'] : (int)CURRENT_COMPUTER_ID;
-writeUsageLog('PAGE_LOAD', ['cid' => $_pageCid]);
+$_pageCid    = isset($_REQUEST['cid'])  ? (int)$_REQUEST['cid']  : (int)CURRENT_COMPUTER_ID;
+$_isServe    = isset($_GET['mode']) && $_GET['mode'] === 'serve';
+$_pageTitle  = $_isServe ? 'Serve Display' : 'Staff Display';
+writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid]);
 ?>
 <!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title><?php echo h(APP_TITLE); ?> - Staff Display</title>
+    <title><?php echo h($_pageTitle); ?></title>
     <link rel="icon" type="image/svg+xml" href="logo.svg">
     <link rel="apple-touch-icon" href="logo.svg">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1683ff">
+    <meta name="theme-color" content="<?php echo $_isServe ? '#0d9488' : '#1683ff'; ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Staff Display">
@@ -40,6 +42,44 @@ writeUsageLog('PAGE_LOAD', ['cid' => $_pageCid]);
                 radial-gradient(circle at top right,rgba(255,138,31,.14),transparent 24%),
                 linear-gradient(180deg,var(--bg),var(--bg2));
         }
+
+        /* Serve mode overrides */
+        body.serve-mode{
+            background:
+                radial-gradient(circle at top left,rgba(13,148,136,.12),transparent 28%),
+                radial-gradient(circle at top right,rgba(234,88,12,.10),transparent 24%),
+                linear-gradient(180deg,#f0fdfa,#fff7ed);
+        }
+        body.serve-mode .topbar{
+            background:linear-gradient(135deg,rgba(4,78,70,.92),rgba(13,148,136,.88),rgba(234,88,12,.80));
+            box-shadow:0 6px 18px rgba(4,78,70,.20);
+        }
+        /* serve card colours */
+        body.serve-mode .table-card.s-ready{
+            border-color:#86efac;
+            background:linear-gradient(180deg,#dcfce7,#fff);
+            box-shadow:0 0 0 3px rgba(22,163,74,.20),var(--shadow);
+            animation:pulse-ready 2s ease-in-out infinite;
+        }
+        @keyframes pulse-ready{
+            0%,100%{box-shadow:0 0 0 3px rgba(22,163,74,.20),var(--shadow)}
+            50%{box-shadow:0 0 0 6px rgba(22,163,74,.35),var(--shadow)}
+        }
+        body.serve-mode .table-card.s-cooking{
+            border-color:#fed7aa;
+            background:linear-gradient(180deg,#fff7ed,#fff);
+            box-shadow:0 0 0 3px rgba(234,88,12,.12),var(--shadow);
+        }
+        body.serve-mode .table-card.s-ready .tc-name{color:#15803d}
+        body.serve-mode .table-card.s-cooking .tc-name{color:#c2410c}
+        body.serve-mode .tc-badge.srv-ready{color:#16a34a}
+        body.serve-mode .tc-badge.srv-cooking{color:#ea580c}
+        /* serve order rows */
+        .order-row.r-srv-ready{background:linear-gradient(90deg,#f0fdf4,#fff)}
+        .order-row.r-srv-ready .or-status{color:#16a34a}
+        .order-row.r-served{background:#f9fafb;opacity:.6}
+        .order-row.r-served .or-name{color:#9ca3af;text-decoration:line-through}
+        .order-row.r-served .or-qty{color:#9ca3af}
 
         /* Topbar */
         .topbar{
@@ -177,13 +217,13 @@ writeUsageLog('PAGE_LOAD', ['cid' => $_pageCid]);
         }
     </style>
 </head>
-<body>
+<body<?php echo $_isServe ? ' class="serve-mode"' : ''; ?>>
 
 <div class="topbar">
     <div class="topbar-inner">
         <div class="brand">
             <img src="logo.svg" alt="" style="width:26px;height:26px;border-radius:6px;flex-shrink:0">
-            <span class="brand-name">Staff Display</span>
+            <span class="brand-name"><?php echo $_isServe ? '🍽️ Serve Display' : 'Staff Display'; ?></span>
             <?php if ($machineDisplayName !== ''): ?>
                 <span class="machine-chip"><?php echo h($machineDisplayName); ?></span>
             <?php endif; ?>
@@ -199,7 +239,7 @@ writeUsageLog('PAGE_LOAD', ['cid' => $_pageCid]);
     </div>
 </div>
 
-<div id="zoneBar" class="zone-bar hidden">
+<div id="zoneBar" class="zone-bar<?php echo $_isServe ? ' hidden' : ' hidden'; ?>">
     <div class="zone-bar-inner" id="zoneInner"></div>
 </div>
 
@@ -231,14 +271,16 @@ const cidParam   = PAGE_CID > 0 ? '&cid=' + PAGE_CID : '';
 const PS_DONE     = 1;
 const PS_RESOLVED = 4;
 const PS_VOIDED   = 98;
+const IS_SERVE    = <?php echo $_isServe ? 'true' : 'false'; ?>;
 
 const state = {
     active:   [],
     finished: [],
     zones:    [],
     zoneId:   null,
-    zoneTables:      null,   // Set<string> | null
+    zoneTables:      null,   // Map<string,string> (TableID→TableName) | null
     allowedPrinters: null,   // Set<number> | null (null = no filter)
+    serveTables:     [],     // serve mode
 };
 
 /* ── Utilities ── */
@@ -323,13 +365,15 @@ function buildCard(g){
     </div>`;
 }
 function renderGrid(){
+    if(IS_SERVE){ renderServeGrid(); return; }
+
     const wrap = document.getElementById('tableGrid');
     const groups = groupTables(byZone(state.active), byZone(state.finished));
     const seen   = new Set(groups.map(g => g.key));
 
     if(state.zoneTables){
-        state.zoneTables.forEach(tid => {
-            if(!seen.has(tid)) groups.push({key:tid,name:tid,pending:0,done:0,worst:0,isEmpty:true});
+        state.zoneTables.forEach((tname, tid) => {
+            if(!seen.has(tid)) groups.push({key:tid,name:tname,pending:0,done:0,worst:0,isEmpty:true});
         });
     }
 
@@ -343,6 +387,32 @@ function renderGrid(){
         return;
     }
     wrap.innerHTML = groups.map(buildCard).join('');
+}
+
+function renderServeGrid(){
+    const wrap   = document.getElementById('tableGrid');
+    const tables = state.serveTables;
+
+    if(!tables.length){
+        wrap.innerHTML = '<div class="modal-msg" style="grid-column:1/-1">✅ ไม่มีรายการรออยู่</div>';
+        return;
+    }
+
+    const sorted = [...tables].sort((a,b) => {
+        if((a.cooking===0) !== (b.cooking===0)) return a.cooking===0 ? -1 : 1;
+        return String(a.name).localeCompare(String(b.name), undefined, {numeric:true, sensitivity:'base'});
+    });
+
+    wrap.innerHTML = sorted.map(t => {
+        const cls = t.cooking===0 ? 's-ready' : 's-cooking';
+        const badges = [];
+        if(t.ready   > 0) badges.push(`<div class="tc-badge srv-ready">✅ ${t.ready} พร้อมเสิร์ฟ</div>`);
+        if(t.cooking > 0) badges.push(`<div class="tc-badge srv-cooking">🍳 ${t.cooking} กำลังทำ</div>`);
+        return `<div class="table-card ${cls}" data-key="${esc(t.key)}" data-name="${esc(t.name)}" data-txid="${t.transaction_id||0}" data-date="${esc(t.order_date||'')}">
+            <div class="tc-name">${esc(t.name)}</div>
+            ${badges.join('')}
+        </div>`;
+    }).join('');
 }
 
 /* ── Modal ── */
@@ -380,6 +450,34 @@ function buildRow(row, printerSet){
         </div>
     </div>`;
 }
+function buildServeRow(row){
+    const st     = parseInt(row.ProcessStatus, 10);
+    const served = !!row.ServingDateTime;
+    const isDone = st === PS_DONE || st === PS_RESOLVED;
+    const isCook = !isDone && st !== PS_VOIDED;
+    let cls, lbl;
+    if(served)       { cls='r-served';    lbl='🚚 เสิร์ฟแล้ว'; }
+    else if(isDone)  { cls='r-srv-ready'; lbl='✅ พร้อมเสิร์ฟ'; }
+    else if(isCook)  { cls='r-active';   lbl='🍳 กำลังทำ'; }
+    else             { cls='r-voided';   lbl='🚫 ยกเลิก'; }
+    const name = row.parent_name && String(row.parent_name).trim()
+        ? `${esc(row.parent_name)} · ${esc(row.ProductName||'-')}`
+        : esc(row.ProductName||'-');
+    const finOk = isDone && row.FinishDateTime && row.FinishDateTime !== '0000-00-00 00:00:00';
+    const time  = finOk
+        ? `ส่ง ${esc(fmtTime(row.SubmitOrderDateTime))} · เสร็จ ${esc(fmtTime(row.FinishDateTime))}`
+        : `ส่ง ${esc(fmtTime(row.SubmitOrderDateTime))}`;
+    return `<div class="order-row ${cls}">
+        <div>
+            <div class="or-name">${name}</div>
+            <div class="or-time">${time}</div>
+        </div>
+        <div class="or-right">
+            <div class="or-qty">x${fmtQty(row.ProductAmount)}</div>
+            <div class="or-status">${lbl}</div>
+        </div>
+    </div>`;
+}
 function openModal(key, name){
     if(_modalController) _modalController.abort();
     _modalController = new AbortController();
@@ -390,6 +488,29 @@ function openModal(key, name){
     document.getElementById('modalBody').innerHTML    = '<div class="modal-msg">กำลังโหลด...</div>';
     document.getElementById('tableModal').classList.add('open');
     document.body.style.overflow = 'hidden';
+
+    if(IS_SERVE){
+        const t      = state.serveTables.find(t => t.key === key) || {};
+        const txId   = t.transaction_id || 0;
+        const txParam= txId > 0 ? '&transaction_id='+txId : '';
+        const od     = t.order_date || '';
+        const odParam= !txParam && od ? '&order_date='+encodeURIComponent(od) : '';
+        fetch('api_checker.php?action=list_serve_table_orders&table_id='+encodeURIComponent(key)+txParam+odParam+'&_='+Date.now(),{cache:'no-store',signal:msig})
+            .then(r=>r.json())
+            .then(json=>{
+                if(!json.success) throw new Error(json.error||'error');
+                const rows    = safeArray(json.rows).filter(r=>parseInt(r.ProcessStatus,10)!==PS_VOIDED);
+                const nReady  = rows.filter(r=>{const s=parseInt(r.ProcessStatus,10);return (s===PS_DONE||s===PS_RESOLVED)&&!r.ServingDateTime;}).length;
+                const nCook   = rows.filter(r=>{const s=parseInt(r.ProcessStatus,10);return s!==PS_DONE&&s!==PS_RESOLVED&&s!==PS_VOIDED;}).length;
+                const nServed = rows.filter(r=>!!r.ServingDateTime).length;
+                document.getElementById('modalSub').textContent=`✅ พร้อมเสิร์ฟ ${nReady}  ·  🍳 ทำอยู่ ${nCook}  ·  🚚 เสิร์ฟแล้ว ${nServed}`;
+                document.getElementById('modalBody').innerHTML=rows.length
+                    ? rows.map(buildServeRow).join('')
+                    : '<div class="modal-msg">ไม่มีรายการ</div>';
+            })
+            .catch(err=>{if(err.name==='AbortError')return; document.getElementById('modalBody').innerHTML='<div class="modal-msg">โหลดไม่สำเร็จ</div>';});
+        return;
+    }
 
     const txId    = getTransactionId(key);
     const txParam = txId > 0 ? '&transaction_id=' + txId : '';
@@ -459,20 +580,30 @@ async function loadAll(){
     const sig = _loadController.signal;
     setDot('loading');
     try {
-        const [ar,fr] = await Promise.all([
-            fetch('api_checker.php?action=list_active'  +cidParam+'&_='+Date.now(),{cache:'no-store',signal:sig}).then(r=>r.json()),
-            fetch('api_checker.php?action=list_finished'+cidParam+'&_='+Date.now(),{cache:'no-store',signal:sig}).then(r=>r.json()),
-        ]);
-        if(sig.aborted) return;
-        if(!ar.success) throw new Error(ar.error);
-        if(!fr.success) throw new Error(fr.error);
-        state.active   = safeArray(ar.active_rows);
-        state.finished = safeArray(fr.recent_finished_rows);
-        const pids = Array.isArray(ar.allowed_printer_ids) ? ar.allowed_printer_ids : [];
-        state.allowedPrinters = pids.length > 0 ? new Set(pids.map(Number)) : null;
-        setDot('');
-        const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!r.is_combined&&!isNonKds(r)).length;
-        document.title = pending > 0 ? `(${pending}) Staff Display` : 'Staff Display';
+        if(IS_SERVE){
+            const sv = await fetch('api_checker.php?action=list_serve_view&_='+Date.now(),{cache:'no-store',signal:sig}).then(r=>r.json());
+            if(sig.aborted) return;
+            if(!sv.success) throw new Error(sv.error);
+            state.serveTables = safeArray(sv.rows);
+            setDot('');
+            const nReady = state.serveTables.filter(t=>t.cooking===0).length;
+            document.title = nReady > 0 ? `(${nReady}) Serve Display` : 'Serve Display';
+        } else {
+            const [ar,fr] = await Promise.all([
+                fetch('api_checker.php?action=list_active'  +cidParam+'&_='+Date.now(),{cache:'no-store',signal:sig}).then(r=>r.json()),
+                fetch('api_checker.php?action=list_finished'+cidParam+'&_='+Date.now(),{cache:'no-store',signal:sig}).then(r=>r.json()),
+            ]);
+            if(sig.aborted) return;
+            if(!ar.success) throw new Error(ar.error);
+            if(!fr.success) throw new Error(fr.error);
+            state.active   = safeArray(ar.active_rows);
+            state.finished = safeArray(fr.recent_finished_rows);
+            const pids = Array.isArray(ar.allowed_printer_ids) ? ar.allowed_printer_ids : [];
+            state.allowedPrinters = pids.length > 0 ? new Set(pids.map(Number)) : null;
+            setDot('');
+            const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!r.is_combined&&!isNonKds(r)).length;
+            document.title = pending > 0 ? `(${pending}) Staff Display` : 'Staff Display';
+        }
         renderGrid();
     } catch(e){
         if(e.name === 'AbortError') return;
@@ -485,6 +616,7 @@ document.getElementById('tableGrid').addEventListener('click', e => {
     const c = e.target.closest('.table-card:not(.s-empty)');
     if(c) openModal(c.dataset.key, c.dataset.name);
 });
+/* serve mode: re-render grid click (cards built dynamically) */
 document.getElementById('modalClose').addEventListener('click', closeModal);
 document.getElementById('tableModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
 document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
