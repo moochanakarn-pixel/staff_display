@@ -108,6 +108,7 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
             border:1px solid rgba(255,255,255,.2);transition:background .14s
         }
         .btn-action:active{background:rgba(255,255,255,.32)}
+        a.btn-action{text-decoration:none;display:inline-flex;align-items:center;line-height:34px}
         .btn-fs{
             appearance:none;width:34px;height:34px;border-radius:9px;border:none;cursor:pointer;
             background:rgba(255,255,255,.16);color:#fff;
@@ -230,6 +231,9 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         </div>
         <div class="topbar-actions">
             <div class="status-dot" id="statusDot"></div>
+            <a class="btn-action" href="staff_display.php<?php echo $_isServe ? '' : '?mode=serve'; ?><?php echo $_pageCid > 0 ? ($_isServe ? '?cid='.$_pageCid : '&cid='.$_pageCid) : ''; ?>">
+                <?php echo $_isServe ? '🍳 KDS' : '🍽️ เสิร์ฟ'; ?>
+            </a>
             <button class="btn-action" id="refreshBtn">รีเฟรช</button>
             <button class="btn-fs" id="fsBtn" title="เต็มจอ">
                 <svg class="fs-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
