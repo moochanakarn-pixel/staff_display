@@ -1,5 +1,20 @@
 # Changelog — Staff Display
 
+## [1.9.0] — 2026-05-12
+
+### เพิ่มใหม่
+- `serve_display.php` — หน้า read-only สำหรับพนักงานเสิร์ฟ
+  - แสดงโต๊ะที่มีอาหารพร้อมเสิร์ฟ (ProcessStatus=1/4, ServingDateTime IS NULL)
+  - สีเขียว+pulse = พร้อมเสิร์ฟทั้งหมด, สีส้ม = ยังมีรายการทำอยู่
+  - เรียงโต๊ะพร้อมเสิร์ฟขึ้นก่อน ตามด้วย natural sort ชื่อโต๊ะ
+  - กด card เปิด modal ดูรายละเอียดแต่ละรายการ (กำลังทำ / พร้อมเสิร์ฟ / เสิร์ฟแล้ว)
+  - ไม่มีปุ่มกดทำอะไร — read-only ทั้งหมด
+- `api_checker.php` — เพิ่ม 2 action ใหม่
+  - `list_serve_view` — คืนรายการโต๊ะที่ยังมีของรอเสิร์ฟ (group by table)
+  - `list_serve_table_orders` — คืนรายการอาหารในโต๊ะ รวม ServingDateTime
+
+---
+
 ## [1.8.0] — 2026-05-08
 
 ### เพิ่มใหม่ / แก้ไข
