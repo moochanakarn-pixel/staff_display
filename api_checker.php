@@ -317,6 +317,14 @@ try {
         resolveStatus($conn);
     }
 
+    if ($method === 'GET' && $action === 'list_serve_view') {
+        listServeView($conn);
+    }
+
+    if ($method === 'GET' && $action === 'list_serve_table_orders') {
+        listServeTableOrders($conn);
+    }
+
     if ($method === 'GET' && $action === 'list_zones') {
         listZones($conn);
     }
@@ -515,6 +523,159 @@ function listFinishedData($conn)
         'recent_finished_rows' => $finishedRows,
         'filters' => buildFilterInfo($conn, $overridePrintServerUrl),
     ));
+}
+
+function listServeView($conn)
+{
+    $rows = fetchServeRows($conn);
+    jsonResponse(array(
+        'success'      => true,
+        'generated_at' => date('Y-m-d H:i:s'),
+        'rows'         => $rows,
+    ));
+}
+
+function listServeTableOrders($conn)
+{
+    $tableId     = requestString('table_id', '');
+    $orderDate   = requestString('order_date', '');
+    $transactionId = requestInt('transaction_id', 0);
+
+    if ($tableId === '') {
+        jsonResponse(array('success' => false, 'error' => 'table_id required'));
+        return;
+    }
+
+    writeUsageLog('SERVE_TABLE_OPEN', ['table_id' => $tableId]);
+    $rows = fetchServeTableOrders($conn, $tableId, $transactionId, $orderDate);
+    jsonResponse(array(
+        'success' => true,
+        'rows'    => $rows,
+    ));
+}
+
+function fetchServeRows($conn)
+{
+    $sql = "
+        SELECT
+            opf.ProcessID,
+            opf.TableID,
+            opf.DisplayTableName,
+            opf.TransactionID,
+            opf.OrderDate,
+            opf.ProcessStatus,
+            opf.IsMoveOrder,
+            opf.ServingDateTime,
+            opf.SubmitOrderDateTime
+        FROM orderprocessdetailfront opf
+        WHERE opf.ProcessStatus NOT IN (" . (int)PROCESS_STATUS_VOIDED . ")
+          AND opf.OrderDate = CURDATE()
+          AND opf.ProductSetType NOT IN (14, 15)
+        ORDER BY opf.TableID ASC, opf.ProcessID ASC
+    ";
+
+    $rawRows = fetchAllRows($conn, $sql);
+
+    // group by table
+    $tables = array();
+    foreach ($rawRows as $row) {
+        $isMoved  = (int)$row['IsMoveOrder'] === 1 && strpos((string)$row['DisplayTableName'], '->') !== false;
+        $dispName = (string)$row['DisplayTableName'];
+        $tableId  = (string)$row['TableID'];
+
+        if ($isMoved) {
+            $parts   = explode('->', $dispName);
+            $tableId = trim(end($parts));
+            $dispName = $tableId;
+        }
+
+        $status = (int)$row['ProcessStatus'];
+        $served = !empty($row['ServingDateTime']);
+
+        if (!isset($tables[$tableId])) {
+            $tables[$tableId] = array(
+                'key'         => $tableId,
+                'name'        => $dispName,
+                'transaction_id' => (int)$row['TransactionID'],
+                'order_date'  => (string)$row['OrderDate'],
+                'cooking'     => 0,
+                'ready'       => 0,
+                'served'      => 0,
+            );
+        }
+
+        $isDone = $status === (int)PROCESS_STATUS_FINISHED || $status === (int)PROCESS_STATUS_RESOLVED;
+
+        if ($served) {
+            $tables[$tableId]['served']++;
+        } elseif ($isDone) {
+            $tables[$tableId]['ready']++;
+        } else {
+            $tables[$tableId]['cooking']++;
+        }
+    }
+
+    // คืนเฉพาะโต๊ะที่มีของพร้อมเสิร์ฟหรือยังทำอยู่ (ไม่เอาโต๊ะที่เสิร์ฟครบแล้วทั้งหมด)
+    $result = array();
+    foreach ($tables as $t) {
+        if ($t['cooking'] > 0 || $t['ready'] > 0) {
+            $result[] = $t;
+        }
+    }
+    return array_values($result);
+}
+
+function fetchServeTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '')
+{
+    $selectCols = "
+            opf.ProcessID,
+            opf.SubProcessID,
+            opf.TransactionID,
+            opf.PrinterID,
+            opf.IsMoveOrder,
+            opf.ProductID,
+            opf.ProductName,
+            opf.ProductAmount,
+            opf.ProductSetType,
+            opf.ParentProcessID,
+            opf.SubmitOrderDateTime,
+            opf.FinishDateTime,
+            opf.ServingDateTime,
+            opf.OrderNo,
+            opf.OrderDate,
+            opf.TableID,
+            opf.DisplayTableName,
+            opf.ProcessStatus,
+            opf.SaleModeID,
+            COALESCE(sm.SaleModeName, '-') AS SaleModeName";
+    $join  = "LEFT JOIN salemode sm ON sm.SaleModeID = opf.SaleModeID AND sm.Deleted = 0";
+    $order = "ORDER BY opf.SubmitOrderDateTime ASC, opf.ProcessID ASC, opf.SubProcessID ASC";
+
+    if ($transactionId > 0) {
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.TransactionID = ? $order";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return array();
+        $stmt->bind_param('si', $tableId, $transactionId);
+    } elseif ($orderDate !== '') {
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = ? $order";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return array();
+        $stmt->bind_param('ss', $tableId, $orderDate);
+    } else {
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = CURDATE() $order";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return array();
+        $stmt->bind_param('s', $tableId);
+    }
+
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $rows   = array();
+    while ($row = $result->fetch_assoc()) {
+        $rows[] = $row;
+    }
+    $stmt->close();
+    return attachCommentsToRows($conn, $rows);
 }
 
 function buildFilterInfo($conn = null, $overridePrintServerUrl = '')
