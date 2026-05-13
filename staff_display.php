@@ -2,7 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth_check.php';
 $machineDisplayName = function_exists('getMachineDisplayName') ? getMachineDisplayName() : '';
-$_pageCid    = isset($_REQUEST['cid'])  ? (int)$_REQUEST['cid']  : (int)CURRENT_COMPUTER_ID;
+$_pageCid    = isset($_GET['cid'])  ? (int)$_GET['cid']  : (int)CURRENT_COMPUTER_ID;
 $_isServe    = isset($_GET['mode']) && $_GET['mode'] === 'serve';
 $_pageTitle  = $_isServe ? 'Serve Display' : 'Staff Display';
 writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid]);
@@ -314,7 +314,7 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
     </div>
 </div>
 
-<div id="zoneBar" class="zone-bar<?php echo $_isServe ? ' hidden' : ' hidden'; ?>">
+<div id="zoneBar" class="zone-bar<?php echo $_isServe ? ' hidden' : ''; ?>">
     <div class="zone-bar-inner" id="zoneInner"></div>
 </div>
 

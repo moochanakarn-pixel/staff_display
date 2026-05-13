@@ -57,8 +57,8 @@ function validateSystemSettingsPayload($settings)
     if ($settings['current_computer_id'] <= 0) {
         $errors[] = 'Computer ID ต้องมากกว่า 0';
     }
-    if ($settings['finish_staff_id'] <= 0) {
-        $errors[] = 'Finish Staff ID ต้องมากกว่า 0';
+    if ($settings['finish_staff_id'] < 0) {
+        $errors[] = 'Finish Staff ID ต้องไม่ต่ำกว่า 0';
     }
     if ($settings['threshold_yellow'] <= 0) {
         $errors[] = 'เวลาแจ้งเตือนสีเหลืองต้องมากกว่า 0';
@@ -2052,7 +2052,7 @@ function buildCheckoutPrintServerPayload($row, $printerName, $finishStaffId, $fi
         : '-';
     $orderNo = isset($row['OrderNo']) ? (int)$row['OrderNo'] : 0;
     $submitTime = !empty($row['SubmitOrderDateTime']) ? strtotime((string)$row['SubmitOrderDateTime']) : false;
-    $finishedTime = strtotime((string)$finishedAt);
+    $finishedTime = !empty($finishedAt) ? strtotime((string)$finishedAt) : false;
 
     $lines = array();
     $lines[] = 'CHECKOUT';
