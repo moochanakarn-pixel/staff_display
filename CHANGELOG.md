@@ -1,5 +1,15 @@
 # Changelog — Staff Display
 
+## [2.2.0] — 2026-05-13
+
+### แก้ไขบัค
+- `zone-bar` ternary — ทั้ง 2 branch ให้ผล `' hidden'` เหมือนกัน → zone bar ซ่อนตลอดใน KDS mode แก้เป็น `''` เมื่อไม่ใช่ serve mode
+- `$_pageCid` เปลี่ยนจาก `$_REQUEST['cid']` เป็น `$_GET['cid']` ให้ตรงกับ `PAGE_CID` ฝั่ง JS ป้องกัน cid ผิด scope เมื่อ request มาจาก POST
+- `finish_staff_id` validation — เปลี่ยนเงื่อนไขจาก `<= 0` เป็น `< 0` เพราะ 0 เป็นค่า default ที่ถูกต้อง (ยังไม่ตั้งค่า)
+- `strtotime($finishedAt)` — เพิ่ม guard `!empty()` ก่อน call ป้องกัน false เข้า `date()` เมื่อ finishedAt ว่างเปล่า
+
+---
+
 ## [2.1.0] — 2026-05-13
 
 ### เพิ่มใหม่
