@@ -216,6 +216,80 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
             .table-card{padding:12px 8px 10px}
             .tc-name{font-size:18px}
         }
+
+        /* Settings Panel */
+        .sp-overlay{
+            display:none;position:fixed;inset:0;z-index:200;
+            background:rgba(8,30,60,.55);backdrop-filter:blur(4px);
+            align-items:flex-end;justify-content:center
+        }
+        .sp-overlay.open{display:flex}
+        .sp-box{
+            background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:520px;
+            max-height:90dvh;display:flex;flex-direction:column;
+            box-shadow:0 -14px 44px rgba(8,30,60,.22);animation:slideUp .2s ease
+        }
+        .sp-head{
+            display:flex;align-items:center;justify-content:space-between;
+            padding:16px 18px 12px;border-bottom:1px solid #e5e7eb;flex-shrink:0
+        }
+        .sp-title{font-size:18px;font-weight:bold;color:#0f2945}
+        .sp-close{
+            width:34px;height:34px;border-radius:50%;border:none;background:#f0f4f8;
+            color:#4a6080;font-size:20px;cursor:pointer;
+            display:flex;align-items:center;justify-content:center
+        }
+        .sp-body{overflow-y:auto;padding:12px 16px 28px;display:flex;flex-direction:column;gap:16px}
+        .sp-section{background:#f8fafc;border-radius:14px;padding:14px 14px 10px}
+        .sp-section-title{font-size:12px;font-weight:bold;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+        .sp-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;gap:12px}
+        .sp-row+.sp-row{border-top:1px solid #e5e7eb}
+        .sp-label{font-size:14px;font-weight:bold;color:#0f2945;flex:1}
+        .sp-sublabel{font-size:11px;color:var(--muted);margin-top:1px}
+        .sp-input{
+            width:90px;padding:7px 10px;border:1.5px solid #dbe8f7;border-radius:9px;
+            font-size:14px;font-weight:bold;text-align:center;color:#0f2945;
+            background:#fff;outline:none
+        }
+        .sp-input:focus{border-color:var(--primary)}
+        /* Toggle */
+        .sp-toggle{position:relative;width:44px;height:26px;flex-shrink:0}
+        .sp-toggle input{opacity:0;width:0;height:0}
+        .sp-slider{
+            position:absolute;inset:0;border-radius:999px;
+            background:#d1d5db;cursor:pointer;transition:background .2s
+        }
+        .sp-slider:before{
+            content:'';position:absolute;width:20px;height:20px;border-radius:50%;
+            background:#fff;top:3px;left:3px;transition:transform .2s;
+            box-shadow:0 1px 4px rgba(0,0,0,.2)
+        }
+        .sp-toggle input:checked+.sp-slider{background:var(--primary)}
+        .sp-toggle input:checked+.sp-slider:before{transform:translateX(18px)}
+        /* Refresh pill buttons */
+        .sp-pills{display:flex;gap:6px}
+        .sp-pill{
+            padding:6px 14px;border-radius:999px;border:1.5px solid #dbe8f7;
+            background:#fff;font-size:13px;font-weight:bold;color:var(--muted);cursor:pointer
+        }
+        .sp-pill.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+        /* footer */
+        .sp-foot{
+            padding:12px 16px 20px;border-top:1px solid #e5e7eb;
+            display:flex;gap:10px;flex-shrink:0
+        }
+        .sp-btn-save{
+            flex:1;padding:12px;border-radius:12px;border:none;cursor:pointer;
+            background:var(--primary);color:#fff;font-size:15px;font-weight:bold
+        }
+        .sp-btn-save:active{opacity:.85}
+        .sp-btn-cancel{
+            padding:12px 18px;border-radius:12px;border:1.5px solid #dbe8f7;
+            background:#fff;color:var(--muted);font-size:15px;font-weight:bold;cursor:pointer
+        }
+        .sp-msg{font-size:13px;text-align:center;padding:4px 0;min-height:20px}
+        .sp-msg.ok{color:var(--success)}
+        .sp-msg.err{color:var(--danger)}
     </style>
 </head>
 <body<?php echo $_isServe ? ' class="serve-mode"' : ''; ?>>
@@ -395,7 +469,8 @@ function renderGrid(){
 
 function renderServeGrid(){
     const wrap   = document.getElementById('tableGrid');
-    const tables = state.serveTables;
+    const readyOnly = (function(){ try{ return JSON.parse(localStorage.getItem('kds_serve_ready_only')||'false'); }catch(e){return false;} })();
+    const tables = readyOnly ? state.serveTables.filter(t => t.cooking === 0) : state.serveTables;
 
     if(!tables.length){
         wrap.innerHTML = '<div class="modal-msg" style="grid-column:1/-1">✅ ไม่มีรายการรออยู่</div>';
@@ -650,6 +725,201 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
 loadAll();
 loadZones();
 setInterval(() => { if(!document.hidden) loadAll(); }, REFRESH_MS);
+
+/* ── Settings Panel ── */
+(function(){
+    /* localStorage helpers */
+    const LS = {
+        get: (k, def) => { try{ const v=localStorage.getItem(k); return v===null?def:JSON.parse(v); }catch(e){return def;} },
+        set: (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+    };
+
+    /* Apply localStorage-only settings on load */
+    function applyLocalSettings(){
+        const hideBtn = LS.get('kds_hide_serve_btn', false);
+        const el = document.querySelector('a.btn-action');
+        if(el) el.style.display = hideBtn ? 'none' : '';
+    }
+    applyLocalSettings();
+
+    /* serve_ready_only applied in renderServeGrid already reads LS */
+    window._serveReadyOnly  = () => LS.get('kds_serve_ready_only', false);
+
+    /* Build HTML */
+    const overlay = document.createElement('div');
+    overlay.className = 'sp-overlay';
+    overlay.id = 'spOverlay';
+    overlay.innerHTML = `
+    <div class="sp-box">
+        <div class="sp-head">
+            <div class="sp-title">⚙️ ตั้งค่า</div>
+            <button class="sp-close" id="spClose">×</button>
+        </div>
+        <div class="sp-body">
+            <div class="sp-section">
+                <div class="sp-section-title">⏱️ เวลา & รีเฟรช</div>
+                <div class="sp-row">
+                    <div><div class="sp-label">เตือนสีเหลือง</div><div class="sp-sublabel">นาที</div></div>
+                    <input class="sp-input" id="spYellow" type="number" min="1" max="999">
+                </div>
+                <div class="sp-row">
+                    <div><div class="sp-label">เตือนสีแดง</div><div class="sp-sublabel">นาที</div></div>
+                    <input class="sp-input" id="spRed" type="number" min="1" max="999">
+                </div>
+                <div class="sp-row">
+                    <div class="sp-label">รีเฟรชทุก</div>
+                    <div class="sp-pills">
+                        <button class="sp-pill" data-ms="15000">15s</button>
+                        <button class="sp-pill" data-ms="30000">30s</button>
+                        <button class="sp-pill" data-ms="60000">60s</button>
+                    </div>
+                </div>
+            </div>
+            <div class="sp-section">
+                <div class="sp-section-title">🔔 การแจ้งเตือน</div>
+                <div class="sp-row">
+                    <div class="sp-label">เสียงแจ้งเตือน</div>
+                    <label class="sp-toggle"><input type="checkbox" id="spSound"><span class="sp-slider"></span></label>
+                </div>
+            </div>
+            <div class="sp-section">
+                <div class="sp-section-title">🖥️ จอแสดงผล</div>
+                <div class="sp-row">
+                    <div class="sp-label">ชื่อจอ</div>
+                    <input class="sp-input" id="spMachineName" type="text" style="width:140px;text-align:left">
+                </div>
+                <div class="sp-row">
+                    <div><div class="sp-label">DB Host / IP</div><div class="sp-sublabel">ที่อยู่ฐานข้อมูล</div></div>
+                    <input class="sp-input" id="spDbHost" type="text" style="width:140px;text-align:left">
+                </div>
+                <div class="sp-row">
+                    <div><div class="sp-label">Database Name</div><div class="sp-sublabel">ชื่อฐานข้อมูล</div></div>
+                    <input class="sp-input" id="spDbName" type="text" style="width:140px;text-align:left">
+                </div>
+                <div class="sp-row">
+                    <div><div class="sp-label">Computer ID</div><div class="sp-sublabel">หมายเลขเครื่อง / Zone</div></div>
+                    <input class="sp-input" id="spCid" type="number" min="1">
+                </div>
+            </div>
+            <div class="sp-section">
+                <div class="sp-section-title">🍽️ Serve Mode</div>
+                <div class="sp-row">
+                    <div><div class="sp-label">แสดงเฉพาะโต๊ะพร้อมเสิร์ฟ</div><div class="sp-sublabel">ซ่อนโต๊ะที่ยังทำอยู่</div></div>
+                    <label class="sp-toggle"><input type="checkbox" id="spReadyOnly"><span class="sp-slider"></span></label>
+                </div>
+                <div class="sp-row">
+                    <div><div class="sp-label">ซ่อนปุ่มสลับหน้าเสิร์ฟ</div><div class="sp-sublabel">ไม่แสดงปุ่มใน topbar</div></div>
+                    <label class="sp-toggle"><input type="checkbox" id="spHideServeBtn"><span class="sp-slider"></span></label>
+                </div>
+            </div>
+            <div class="sp-msg" id="spMsg"></div>
+        </div>
+        <div class="sp-foot">
+            <button class="sp-btn-cancel" id="spCancel">ยกเลิก</button>
+            <button class="sp-btn-save" id="spSave">💾 บันทึก</button>
+        </div>
+    </div>`;
+    document.body.appendChild(overlay);
+
+    /* Hidden server-side snapshot */
+    let _snap = {};
+
+    /* Load settings into form */
+    async function openSettings(){
+        document.getElementById('spMsg').textContent = '';
+        document.getElementById('spMsg').className = 'sp-msg';
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+
+        try {
+            const res  = await fetch('api_checker.php?action=get_system_settings&_='+Date.now(),{cache:'no-store'});
+            const json = await res.json();
+            if(!json.success) throw new Error(json.error||'error');
+            _snap = json.settings || {};
+        } catch(e){ _snap = {}; }
+
+        /* Fill server fields */
+        document.getElementById('spYellow').value      = _snap.threshold_yellow || 10;
+        document.getElementById('spRed').value         = _snap.threshold_red    || 20;
+        document.getElementById('spSound').checked     = !!_snap.sound_enabled;
+        document.getElementById('spMachineName').value = _snap.current_computer_name || '';
+        document.getElementById('spDbHost').value      = _snap.db_host || '';
+        document.getElementById('spDbName').value      = _snap.db_name || '';
+        document.getElementById('spCid').value         = _snap.current_computer_id || '';
+
+        /* Fill localStorage fields */
+        const ms = LS.get('kds_refresh_ms', REFRESH_MS);
+        document.querySelectorAll('.sp-pill').forEach(p => {
+            p.classList.toggle('active', parseInt(p.dataset.ms)===ms);
+        });
+        document.getElementById('spReadyOnly').checked   = LS.get('kds_serve_ready_only', false);
+        document.getElementById('spHideServeBtn').checked= LS.get('kds_hide_serve_btn', false);
+    }
+
+    /* Pill selection */
+    overlay.addEventListener('click', e => {
+        const p = e.target.closest('.sp-pill');
+        if(p){ document.querySelectorAll('.sp-pill').forEach(x=>x.classList.remove('active')); p.classList.add('active'); }
+    });
+
+    /* Save */
+    document.getElementById('spSave').addEventListener('click', async () => {
+        const msg = document.getElementById('spMsg');
+        msg.textContent = 'กำลังบันทึก...'; msg.className = 'sp-msg';
+
+        /* localStorage settings */
+        const activePill = overlay.querySelector('.sp-pill.active');
+        LS.set('kds_refresh_ms',       activePill ? parseInt(activePill.dataset.ms) : REFRESH_MS);
+        LS.set('kds_serve_ready_only', document.getElementById('spReadyOnly').checked);
+        LS.set('kds_hide_serve_btn',   document.getElementById('spHideServeBtn').checked);
+
+        /* Server settings via existing API */
+        const body = new URLSearchParams({
+            db_host:              document.getElementById('spDbHost').value.trim(),
+            db_port:              _snap.db_port || 3306,
+            db_name:              document.getElementById('spDbName').value.trim(),
+            current_computer_id:  document.getElementById('spCid').value,
+            current_computer_name:document.getElementById('spMachineName').value.trim(),
+            finish_staff_id:      _snap.finish_staff_id || 0,
+            threshold_yellow:     document.getElementById('spYellow').value,
+            threshold_red:        document.getElementById('spRed').value,
+            sound_enabled:        document.getElementById('spSound').checked ? 1 : 0,
+            barcode_camera_enabled: _snap.barcode_camera_enabled ?? 1,
+            kds_two_step_checkout:  _snap.kds_two_step_checkout  ?? 0,
+        });
+
+        try {
+            const res  = await fetch('api_checker.php?action=save_system_settings',{method:'POST',body});
+            const json = await res.json();
+            if(!json.success) throw new Error(json.error||'บันทึกไม่สำเร็จ');
+            msg.textContent = '✅ บันทึกเรียบร้อย — รีโหลดหน้าเพื่อใช้งาน'; msg.className='sp-msg ok';
+            applyLocalSettings();
+        } catch(e){
+            msg.textContent = '❌ ' + e.message; msg.className='sp-msg err';
+        }
+    });
+
+    /* Close */
+    function closeSettings(){ overlay.classList.remove('open'); document.body.style.overflow=''; }
+    document.getElementById('spClose').addEventListener('click', closeSettings);
+    document.getElementById('spCancel').addEventListener('click', closeSettings);
+    overlay.addEventListener('click', e => { if(e.target===overlay) closeSettings(); });
+    document.addEventListener('keydown', e => { if(e.key==='Escape' && overlay.classList.contains('open')) closeSettings(); });
+
+    /* Triple-tap logo */
+    let _taps = [], _tapTimer = null;
+    const brand = document.querySelector('.brand');
+    if(brand){
+        brand.addEventListener('click', () => {
+            _taps.push(Date.now());
+            _taps = _taps.filter(t => Date.now()-t < 1500);
+            clearTimeout(_tapTimer);
+            if(_taps.length >= 3){ _taps=[]; openSettings(); }
+            else { _tapTimer = setTimeout(()=>{ _taps=[]; }, 1500); }
+        });
+    }
+})();
+
 </script>
 </body>
 </html>

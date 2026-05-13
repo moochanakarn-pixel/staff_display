@@ -1,5 +1,18 @@
 # Changelog — Staff Display
 
+## [2.1.0] — 2026-05-13
+
+### เพิ่มใหม่
+- หน้าตั้งค่า — เปิดด้วยการแตะ logo 3 ครั้งใน 1.5 วินาที
+  - **⏱️ เวลา & รีเฟรช**: เตือนสีเหลือง/แดง (นาที), รีเฟรชทุก 15/30/60 วินาที
+  - **🔔 การแจ้งเตือน**: เปิด/ปิดเสียง
+  - **🖥️ จอแสดงผล**: ชื่อจอ, DB Host, Database Name, Computer ID (port/user/pass ซ่อน)
+  - **🍽️ Serve Mode**: แสดงเฉพาะโต๊ะพร้อมเสิร์ฟ, ซ่อนปุ่มสลับหน้าเสิร์ฟ
+- ค่า server-side บันทึกผ่าน `save_system_settings` API → `settings.local.php`
+- ค่า client-side (refresh, serve options) บันทึกใน localStorage
+
+---
+
 ## [2.0.0] — 2026-05-12
 
 ### เพิ่มใหม่
