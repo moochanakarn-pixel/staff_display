@@ -299,9 +299,6 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         <div class="brand">
             <img src="logo.svg" alt="" style="width:26px;height:26px;border-radius:6px;flex-shrink:0">
             <span class="brand-name"><?php echo $_isServe ? '🍽️ Serve Display' : 'Staff Display'; ?></span>
-            <?php if ($machineDisplayName !== ''): ?>
-                <span class="machine-chip"><?php echo h($machineDisplayName); ?></span>
-            <?php endif; ?>
         </div>
         <div class="topbar-actions">
             <div class="status-dot" id="statusDot"></div>
