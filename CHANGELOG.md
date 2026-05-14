@@ -138,7 +138,6 @@
 
 ### เปิดตัวครั้งแรก
 - `staff_display.php` — หน้าแสดงผลพนักงาน (ไฟล์หลัก)
-- `staff_display2.php` — ไฟล์ทดลองไอเดีย (ไม่ใช้งาน Production)
 - `api_checker.php` — Backend ตรวจสอบ API / ดึงข้อมูล
 - `auth_check.php` — ตรวจสอบสิทธิ์การเข้าถึง
 - `config.php` — ตั้งค่าระบบหลัก
