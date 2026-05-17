@@ -156,10 +156,11 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
             padding:2px 10px 2px 7px;border-radius:999px;
             background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.2);
             font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
-            transition:background .14s;
+            transition:background .14s;max-width:140px;overflow:hidden;
         }
         .staff-chip:hover{background:rgba(255,255,255,.28);}
         .staff-chip svg{width:13px;height:13px;flex-shrink:0;}
+        #staffNameChip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
         /* Zone bar */
         .zone-bar{background:rgba(255,255,255,.95);border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
@@ -849,7 +850,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
     document.getElementById('loginBtn').addEventListener('click', doLogin);
     document.getElementById('loginCode').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
     document.getElementById('logoutBtn').addEventListener('click', () => {
-        if(!confirm('ออกจากระบบ?')) return;
+        if(document.fullscreenElement) document.exitFullscreen();
         localStorage.removeItem(LS_KEY);
         showLogin();
     });
