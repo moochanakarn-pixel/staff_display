@@ -189,6 +189,7 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         .table-card.s-done{border-color:#6edda0;background:linear-gradient(180deg,#edfff5,#fff);box-shadow:0 0 0 3px rgba(18,161,80,.18)}
         .table-card.s-empty{border-color:#e5e7eb;background:#f9fafb;box-shadow:none;opacity:.6;cursor:default}
         .tc-name{font-size:22px;font-weight:bold;color:#0f2945;line-height:1.1}
+        .tc-open-time{font-size:11px;color:#8fa3bc;font-weight:600;letter-spacing:.3px}
         .table-card.s-done .tc-name{color:#0b7a3e}
         .table-card.s-empty .tc-name{color:#9ca3af}
         .tc-badge{font-size:12px;font-weight:bold;padding:2px 0}
@@ -456,7 +457,7 @@ function byZone(rows){
 function groupTables(active, finished){
     const map = new Map();
     function get(key, name){
-        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0});
+        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null});
         return map.get(key);
     }
     safeArray(active).forEach(r => {
@@ -466,6 +467,10 @@ function groupTables(active, finished){
         if(!r.is_voided && !r.is_combined && !isNonKds(r)){
             g.pending++;
             g.worst = Math.max(g.worst, waitMin(r));
+        }
+        if(r.SubmitOrderDateTime){
+            const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
+            if(!isNaN(t) && (g.openTime === null || t < g.openTime)) g.openTime = t;
         }
     });
     safeArray(finished).forEach(r => {
@@ -493,8 +498,12 @@ function buildCard(g){
     const badges = [];
     if(g.pending > 0) badges.push(`<div class="tc-badge kitchen">🍳 ${g.pending} กำลังทำ</div>`);
     if(g.done    > 0) badges.push(`<div class="tc-badge done">✅ ${g.done} เสร็จแล้ว</div>`);
+    const openStr = g.openTime
+        ? g.openTime.toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'})
+        : '';
     return `<div class="table-card ${cls}" data-key="${esc(g.key)}" data-name="${esc(String(g.name))}">
         <div class="tc-name">${esc(String(g.name))}</div>
+        ${openStr ? `<div class="tc-open-time">⏱ ${openStr}</div>` : ''}
         ${badges.join('')}
     </div>`;
 }
