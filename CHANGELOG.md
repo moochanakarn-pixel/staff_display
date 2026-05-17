@@ -1,5 +1,37 @@
 # Changelog — Staff Display
 
+## [2.5.0] — 2026-05-17
+
+### แก้ไขบัค
+- `config.php` default `db_port` จาก 3307 → 3306 (standard MySQL port)
+- Logout button — ออก fullscreen ก่อนแสดง login overlay (browser บล็อก `confirm()` ใน fullscreen)
+- `.staff-chip` — เพิ่ม `max-width:140px` + `text-overflow:ellipsis` ป้องกันชื่อยาวดัน topbar พัง
+
+---
+
+## [2.4.0] — 2026-05-17
+
+### เพิ่มใหม่
+- แสดงเวลาเปิดโต๊ะ (`⏱ HH:MM`) บนการ์ดใต้ชื่อโต๊ะ — ใช้ `SubmitOrderDateTime` ที่เร็วที่สุดของแต่ละโต๊ะ ไม่ต้องเพิ่ม column ใน DB
+
+---
+
+## [2.3.0] — 2026-05-17
+
+### เพิ่มใหม่
+- หน้า Login overlay — กรอก StaffCode เพื่อเข้าใช้งาน
+  - POST `lookup_staff` → query ตาราง `staffs` WHERE StaffCode = ? AND Deleted = 0
+  - เก็บ `{staff_id, staff_name}` ใน `localStorage['staff_display']` — reload ไม่ต้อง login ซ้ำ
+  - แสดงชื่อพนักงานเป็น chip ใน topbar — กดเพื่อ logout
+  - Polling เริ่มเฉพาะเมื่อ login สำเร็จเท่านั้น
+
+### ล้างโค้ด
+- ลบ `staff_display2.php` และอ้างอิงทั้งหมดออกจาก repo (ไฟล์ทดลองที่ไม่ได้ใช้งาน)
+- แก้ `manifest.json` `start_url` จาก `staff_display2.php` → `staff_display.php`
+- แก้ `web.config` ลบ IIS rewrite rule ที่ต้องการ URL Rewrite Module ออก
+
+---
+
 ## [2.2.0] — 2026-05-13
 
 ### แก้ไขบัค
