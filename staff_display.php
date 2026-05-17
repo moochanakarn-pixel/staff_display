@@ -117,6 +117,50 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         }
         .btn-fs svg{width:15px;height:15px}
 
+        /* ── Login overlay ── */
+        .login-overlay{
+            position:fixed;inset:0;z-index:200;
+            background:linear-gradient(135deg,#0a3d80 0%,#1683ff 55%,#e8823a 100%);
+            display:flex;align-items:center;justify-content:center;
+            transition:opacity .25s;
+        }
+        .login-overlay.hidden{opacity:0;pointer-events:none;}
+        .login-card{
+            background:#fff;border-radius:22px;padding:40px 36px 36px;
+            width:340px;max-width:90vw;
+            box-shadow:0 24px 60px rgba(8,40,100,.28);
+            display:flex;flex-direction:column;align-items:center;gap:0;
+        }
+        .login-logo{width:56px;height:56px;border-radius:12px;margin-bottom:14px;}
+        .login-title{font-size:22px;font-weight:800;color:#0a2540;margin:0 0 4px;}
+        .login-sub{font-size:13px;color:#7a8fa6;margin:0 0 22px;text-align:center;}
+        .login-input{
+            width:100%;box-sizing:border-box;
+            height:46px;border-radius:12px;border:1.5px solid #d8e3ef;
+            padding:0 14px;font-size:15px;color:#0a2540;outline:none;
+            transition:border-color .15s;margin-bottom:10px;
+            text-align:center;letter-spacing:2px;
+        }
+        .login-input:focus{border-color:#1683ff;}
+        .login-error{font-size:12px;color:#e53e3e;min-height:18px;margin-bottom:6px;text-align:center;}
+        .login-btn{
+            width:100%;height:46px;border-radius:12px;border:none;cursor:pointer;
+            background:linear-gradient(135deg,#1260cc,#1683ff);color:#fff;
+            font-size:15px;font-weight:700;letter-spacing:.5px;
+            transition:opacity .15s;margin-top:4px;
+        }
+        .login-btn:disabled{opacity:.6;cursor:default;}
+        .login-btn:not(:disabled):active{opacity:.85;}
+        .staff-chip{
+            display:inline-flex;align-items:center;gap:5px;
+            padding:2px 10px 2px 7px;border-radius:999px;
+            background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.2);
+            font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
+            transition:background .14s;
+        }
+        .staff-chip:hover{background:rgba(255,255,255,.28);}
+        .staff-chip svg{width:13px;height:13px;flex-shrink:0;}
+
         /* Zone bar */
         .zone-bar{background:rgba(255,255,255,.95);border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
         .zone-bar-inner{max-width:1200px;margin:0 auto;padding:8px 12px;display:flex;gap:7px;overflow-x:auto;scrollbar-width:none}
@@ -294,6 +338,17 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
 </head>
 <body<?php echo $_isServe ? ' class="serve-mode"' : ''; ?>>
 
+<div id="loginOverlay" class="login-overlay">
+    <div class="login-card">
+        <img src="logo.svg" alt="" class="login-logo">
+        <h1 class="login-title"><?php echo $_isServe ? 'Serve Display' : 'Staff Display'; ?></h1>
+        <p class="login-sub">กรอกรหัสพนักงานเพื่อเข้าใช้งาน</p>
+        <input type="text" id="loginCode" class="login-input" placeholder="รหัสพนักงาน" autocomplete="off" autocorrect="off" spellcheck="false">
+        <div class="login-error" id="loginError"></div>
+        <button class="login-btn" id="loginBtn">เข้าสู่ระบบ</button>
+    </div>
+</div>
+
 <div class="topbar">
     <div class="topbar-inner">
         <div class="brand">
@@ -306,6 +361,10 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
                 <?php echo $_isServe ? '🍳 KDS' : '🍽️ เสิร์ฟ'; ?>
             </a>
             <button class="btn-action" id="refreshBtn">รีเฟรช</button>
+            <button class="staff-chip" id="logoutBtn" style="display:none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                <span id="staffNameChip">-</span>
+            </button>
             <button class="btn-fs" id="fsBtn" title="เต็มจอ">
                 <svg class="fs-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
                 <svg class="fs-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="display:none"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
@@ -718,10 +777,76 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
     upd();
 })();
 
-/* ── Init ── */
-loadAll();
-loadZones();
-setInterval(() => { if(!document.hidden) loadAll(); }, REFRESH_MS);
+/* ── Auth ── */
+(function(){
+    const LS_KEY = 'staff_display';
+    let _pollTimer = null;
+
+    function startPolling(){
+        stopPolling();
+        loadAll();
+        loadZones();
+        _pollTimer = setInterval(() => { if(!document.hidden) loadAll(); }, REFRESH_MS);
+    }
+    function stopPolling(){
+        if(_pollTimer){ clearInterval(_pollTimer); _pollTimer = null; }
+    }
+    function setStaff(id, name){
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('logoutBtn').style.display = '';
+        document.getElementById('staffNameChip').textContent = name;
+        startPolling();
+    }
+    function showLogin(){
+        stopPolling();
+        document.getElementById('loginOverlay').classList.remove('hidden');
+        document.getElementById('logoutBtn').style.display = 'none';
+        document.getElementById('loginError').textContent = '';
+        document.getElementById('loginCode').value = '';
+        setTimeout(() => document.getElementById('loginCode').focus(), 50);
+    }
+    function initAuth(){
+        try {
+            const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+            if(saved && saved.staff_id > 0){ setStaff(saved.staff_id, saved.staff_name); return; }
+        } catch(e){}
+        showLogin();
+    }
+    async function doLogin(){
+        const code = document.getElementById('loginCode').value.trim();
+        if(!code) return;
+        const btn = document.getElementById('loginBtn');
+        const err = document.getElementById('loginError');
+        btn.disabled = true;
+        err.textContent = '';
+        try {
+            const fd = new FormData();
+            fd.append('staff_code', code);
+            const res  = await fetch('api_checker.php?action=lookup_staff', {method:'POST', body:fd});
+            const json = await res.json();
+            if(json.success){
+                localStorage.setItem(LS_KEY, JSON.stringify({staff_id: json.staff_id, staff_name: json.staff_name}));
+                setStaff(json.staff_id, json.staff_name);
+            } else {
+                err.textContent = json.error || 'รหัสพนักงานไม่ถูกต้อง';
+            }
+        } catch(e){
+            err.textContent = 'เชื่อมต่อไม่ได้ กรุณาลองใหม่';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', doLogin);
+    document.getElementById('loginCode').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        if(!confirm('ออกจากระบบ?')) return;
+        localStorage.removeItem(LS_KEY);
+        showLogin();
+    });
+
+    initAuth();
+})();
 
 /* ── Settings Panel ── */
 (function(){

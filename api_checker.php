@@ -297,6 +297,10 @@ try {
 
     $conn = getDbConnection();
 
+    if ($method === 'POST' && $action === 'lookup_staff') {
+        lookupStaff($conn);
+    }
+
     if ($method === 'POST' && $action === 'confirm_one') {
         confirmOne($conn);
     }
@@ -1632,6 +1636,41 @@ function fetchAllRows($conn, $sql)
     }
 
     return $rows;
+}
+
+function lookupStaff($conn)
+{
+    $staffCode = isset($_POST['staff_code']) ? trim((string)$_POST['staff_code']) : '';
+    if ($staffCode === '') {
+        jsonResponse(array('success' => false, 'error' => 'กรุณากรอกรหัสพนักงาน'));
+        return;
+    }
+
+    $sql = "
+        SELECT StaffID,
+               COALESCE(NULLIF(TRIM(CONCAT(COALESCE(StaffFirstName,''),' ',COALESCE(StaffLastName,''))),''  ), '') AS StaffName
+        FROM staffs
+        WHERE StaffCode = ?
+          AND Deleted = 0
+        LIMIT 1
+    ";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        jsonResponse(array('success' => false, 'error' => 'DB error'), 500);
+        return;
+    }
+    $stmt->bind_param('s', $staffCode);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result && ($row = $result->fetch_assoc())) {
+        $staffId   = (int)$row['StaffID'];
+        $staffName = trim((string)$row['StaffName']) ?: 'Staff #' . $staffId;
+        $stmt->close();
+        jsonResponse(array('success' => true, 'staff_id' => $staffId, 'staff_name' => $staffName));
+    } else {
+        $stmt->close();
+        jsonResponse(array('success' => false, 'error' => 'ไม่พบรหัสพนักงาน'));
+    }
 }
 
 function confirmOne($conn)
