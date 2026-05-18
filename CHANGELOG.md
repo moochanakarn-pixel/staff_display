@@ -1,5 +1,12 @@
 # Changelog — Staff Display
 
+## [2.9.0] — 2026-05-18
+
+### เพิ่มใหม่
+- `guide.html` — คู่มือการใช้งานแบบ standalone web page ครอบคลุม: login, topbar, การ์ดโต๊ะ, สีสถานะ, modal, zone filter, หน้าตั้งค่า
+
+---
+
 ## [2.8.0] — 2026-05-18
 
 ### แก้ไขบัค
