@@ -2,6 +2,7 @@
   "name": "Staff Display KDS",
   "short_name": "Staff Display",
   "description": "ระบบแสดงสถานะออเดอร์สำหรับพนักงาน (หลังร้าน)",
+  "scope": "./",
   "start_url": "./staff_display.php",
   "display": "standalone",
   "background_color": "#edf5ff",
