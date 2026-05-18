@@ -803,9 +803,9 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
     }
     function setStaff(id, name){
         document.getElementById('loginOverlay').classList.add('hidden');
-        const showChip = id > 0;
-        document.getElementById('logoutBtn').style.display = showChip ? '' : 'none';
-        document.getElementById('staffNameChip').textContent = name;
+        document.getElementById('logoutBtn').style.display = '';
+        document.getElementById('logoutBtn').dataset.isGuest = id > 0 ? '0' : '1';
+        document.getElementById('staffNameChip').textContent = id > 0 ? name : 'เข้าสู่ระบบ';
         startPolling();
     }
     function showLogin(){
@@ -853,9 +853,13 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
     document.getElementById('loginBtn').addEventListener('click', doLogin);
     document.getElementById('loginCode').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
     document.getElementById('logoutBtn').addEventListener('click', () => {
-        if(document.fullscreenElement) document.exitFullscreen();
-        localStorage.removeItem(LS_KEY);
-        showLogin();
+        if(document.getElementById('logoutBtn').dataset.isGuest === '1'){
+            showLogin();
+        } else {
+            if(document.fullscreenElement) document.exitFullscreen();
+            localStorage.removeItem(LS_KEY);
+            showLogin();
+        }
     });
 
     initAuth();
