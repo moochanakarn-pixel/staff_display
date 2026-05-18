@@ -707,7 +707,7 @@ async function setZone(zid){
         try {
             const res  = await fetch('api_checker.php?action=list_tables_in_zone&zone_id='+encodeURIComponent(zid)+cidParam+'&_='+Date.now(),{cache:'no-store'});
             const json = await res.json();
-            state.zoneTables = json.success ? new Set(safeArray(json.tables).map(t=>String(t.TableID))) : null;
+            state.zoneTables = json.success ? new Map(safeArray(json.tables).map(t=>[String(t.TableID), t.TableName||String(t.TableID)])) : null;
         } catch(e){ state.zoneTables=null; }
     } else {
         state.zoneTables = null;
@@ -803,7 +803,8 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
     }
     function setStaff(id, name){
         document.getElementById('loginOverlay').classList.add('hidden');
-        document.getElementById('logoutBtn').style.display = '';
+        const showChip = id > 0;
+        document.getElementById('logoutBtn').style.display = showChip ? '' : 'none';
         document.getElementById('staffNameChip').textContent = name;
         startPolling();
     }
@@ -816,6 +817,8 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
         setTimeout(() => document.getElementById('loginCode').focus(), 50);
     }
     function initAuth(){
+        const requireLogin = (function(){ try{ return JSON.parse(localStorage.getItem('kds_require_login')??'true'); }catch(e){ return true; } })();
+        if(!requireLogin){ setStaff(0, 'Guest'); return; }
         try {
             const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
             if(saved && saved.staff_id > 0){ setStaff(saved.staff_id, saved.staff_name); return; }
@@ -934,6 +937,13 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
                 </div>
             </div>
             <div class="sp-section">
+                <div class="sp-section-title">🔐 การเข้าใช้งาน</div>
+                <div class="sp-row">
+                    <div><div class="sp-label">บังคับใส่รหัสพนักงาน</div><div class="sp-sublabel">ปิด = เข้าใช้งานได้เลยไม่ต้อง login</div></div>
+                    <label class="sp-toggle"><input type="checkbox" id="spRequireLogin"><span class="sp-slider"></span></label>
+                </div>
+            </div>
+            <div class="sp-section">
                 <div class="sp-section-title">🍽️ Serve Mode</div>
                 <div class="sp-row">
                     <div><div class="sp-label">แสดงเฉพาะโต๊ะพร้อมเสิร์ฟ</div><div class="sp-sublabel">ซ่อนโต๊ะที่ยังทำอยู่</div></div>
@@ -986,6 +996,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
         });
         document.getElementById('spReadyOnly').checked   = LS.get('kds_serve_ready_only', false);
         document.getElementById('spHideServeBtn').checked= LS.get('kds_hide_serve_btn', false);
+        document.getElementById('spRequireLogin').checked = LS.get('kds_require_login', true);
     }
 
     /* Pill selection */
@@ -1004,6 +1015,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
         LS.set('kds_refresh_ms',       activePill ? parseInt(activePill.dataset.ms) : REFRESH_MS);
         LS.set('kds_serve_ready_only', document.getElementById('spReadyOnly').checked);
         LS.set('kds_hide_serve_btn',   document.getElementById('spHideServeBtn').checked);
+        LS.set('kds_require_login',    document.getElementById('spRequireLogin').checked);
 
         /* Server settings via existing API */
         const body = new URLSearchParams({
