@@ -1,5 +1,28 @@
 # Changelog — Staff Display
 
+## [2.8.0] — 2026-05-18
+
+### แก้ไขบัค
+- `manifest.json` — เพิ่ม `"scope": "./"` ป้องกัน PWA เปิด 2 แถบเมื่อ URL เปลี่ยน (redirect หรือ query string)
+
+---
+
+## [2.7.0] — 2026-05-18
+
+### แก้ไขบัค
+- Guest mode — chip แสดง "เข้าสู่ระบบ" แทนที่จะซ่อน กดได้ทุกเมื่อเพื่อ login เป็นพนักงานจริง
+
+---
+
+## [2.6.0] — 2026-05-18
+
+### เพิ่มใหม่
+- โต๊ะว่างแสดง `TableName` จริงแทน `TableID` — `listTablesInZone` คืน `TableName` และ JS build `Map<TableID,TableName>` แทน `Set`
+- `listZones` — เพิ่ม `WHERE Deleted=0` ไม่แสดงโซนที่ถูกลบ
+- Settings panel — เพิ่ม section "🔐 การเข้าใช้งาน" toggle "บังคับใส่รหัสพนักงาน" (`kds_require_login`) ปิดแล้วข้าม login ได้เลย
+
+---
+
 ## [2.5.0] — 2026-05-17
 
 ### แก้ไขบัค
