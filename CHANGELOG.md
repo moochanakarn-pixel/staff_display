@@ -1,5 +1,15 @@
 # Changelog — Staff Display
 
+## [3.1.0] — 2026-05-19
+
+### แก้ไขบัค
+- **Login error ครั้งแรก** — แก้ปัญหา login ครั้งแรกขึ้น error แต่ครั้งที่สองด้วยรหัสเดิมกลับเข้าได้
+  - `api_checker.php` — เพิ่ม `session_write_close()` ทันทีหลัง `auth_check.php` ปล่อย PHP session file lock ก่อน DB query ป้องกันการบล็อกจาก concurrent request
+  - `staff_display.php` — เพิ่ม `window._isAuthed` flag ตั้งค่าใน `setStaff()` (true) / `showLogin()` (false)
+  - `refreshBtn` และ `visibilitychange` guard ด้วย `_isAuthed` — ป้องกัน `loadAll()` ถูกเรียกขณะ login overlay ยังแสดงอยู่
+
+---
+
 ## [3.0.0] — 2026-05-18
 
 ### เพิ่มใหม่ / ปรับปรุง
