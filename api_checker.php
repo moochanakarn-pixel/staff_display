@@ -481,11 +481,14 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', 
             opf.SaleModeID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
             CASE
-                WHEN opf.TransactionID > 0
-                 AND EXISTS(
+                WHEN EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
-                     WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID = 7
+                     WHERE otf2.TransactionStatusID = 7
+                       AND (
+                           (opf.TransactionID > 0 AND otf2.TransactionID = opf.TransactionID)
+                           OR
+                           (opf.TransactionID = 0 AND otf2.TableID = opf.TableID)
+                       )
                  )
                 THEN 7
                 ELSE 0
@@ -1131,11 +1134,14 @@ function fetchActiveRows($conn)
             opf.SaleModeID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
             CASE
-                WHEN opf.TransactionID > 0
-                 AND EXISTS(
+                WHEN EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
-                     WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID = 7
+                     WHERE otf2.TransactionStatusID = 7
+                       AND (
+                           (opf.TransactionID > 0 AND otf2.TransactionID = opf.TransactionID)
+                           OR
+                           (opf.TransactionID = 0 AND otf2.TableID = opf.TableID)
+                       )
                  )
                 THEN 7
                 ELSE 0
@@ -1203,11 +1209,14 @@ function fetchFinishedRows($conn)
             opf.FinishStaffID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
             CASE
-                WHEN opf.TransactionID > 0
-                 AND EXISTS(
+                WHEN EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
-                     WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID = 7
+                     WHERE otf2.TransactionStatusID = 7
+                       AND (
+                           (opf.TransactionID > 0 AND otf2.TransactionID = opf.TransactionID)
+                           OR
+                           (opf.TransactionID = 0 AND otf2.TableID = opf.TableID)
+                       )
                  )
                 THEN 7
                 ELSE 0

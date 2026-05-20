@@ -1,5 +1,22 @@
 # Changelog — Staff Display
 
+## [3.17.0] — 2026-05-20
+
+### แก้ไขบัค (is_combined ไม่ทำงานเมื่อ TransactionID = 0)
+- **[BUG-TXID-ZERO]** ร้านที่ `orderprocessdetailfront.TransactionID = 0` ทุก row (ไม่ใช้ TransactionID) → เงื่อนไข `opf.TransactionID > 0` ทำให้ `is_combined` ไม่มีวันเป็น true → โต๊ะที่รวมแล้ว (CombineBill) ยังคงแสดงบนจอ
+  - **ตรวจยืนยันจาก data จริง**: `ordertransactionfront` โต๊ะ 7 มี `TransactionStatusID = 7` แต่ `orderprocessdetailfront` มี `TransactionID = 0` → match ไม่ได้
+  - **แก้**: ขยาย condition ใน 3 CASE statements — ถ้า `TransactionID > 0` → match ผ่าน TransactionID (เดิม), ถ้า `TransactionID = 0` → fallback match ผ่าน `TableID` แทน
+  ```sql
+  WHERE otf2.TransactionStatusID = 7
+    AND (
+        (opf.TransactionID > 0 AND otf2.TransactionID = opf.TransactionID)
+        OR
+        (opf.TransactionID = 0 AND otf2.TableID = opf.TableID)
+    )
+  ```
+
+---
+
 ## [3.16.0] — 2026-05-20
 
 ### ปรับปรุง (IsOldSession ใช้ MAX TransactionID แทน ordertransactionfront)
