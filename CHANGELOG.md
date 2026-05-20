@@ -1,5 +1,14 @@
 # Changelog — Staff Display
 
+## [3.6.0] — 2026-05-20
+
+### แก้ไขบัค
+- **การ์ดโต๊ะนับ "✅ เสร็จแล้ว" รวม items ของลูกค้าเก่า** (`staff_display.php`)
+  - `groupTables` นับ `state.finished` โดยไม่กรอง TransactionID — items ที่ทำเสร็จแล้วของลูกค้าเก่าไปบวกในตัวนับ done ของลูกค้าใหม่
+  - แก้: เก็บ `currentTxId` จาก non-combined active rows แล้วกรอง finished rows ให้นับเฉพาะ TransactionID เดียวกัน (หรือถ้าโต๊ะไม่มี active orders เลยก็นับทั้งหมดตามปกติ)
+
+---
+
 ## [3.5.0] — 2026-05-20
 
 ### แก้ไขบัค

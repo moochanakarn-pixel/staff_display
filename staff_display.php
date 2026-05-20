@@ -458,7 +458,7 @@ function byZone(rows){
 function groupTables(active, finished){
     const map = new Map();
     function get(key, name){
-        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null});
+        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null,currentTxId:0});
         return map.get(key);
     }
     safeArray(active).forEach(r => {
@@ -475,11 +475,14 @@ function groupTables(active, finished){
             const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
             if(!isNaN(t) && (g.openTime === null || t < g.openTime)) g.openTime = t;
         }
+        if(!r.is_combined && r.TransactionID > 0) g.currentTxId = parseInt(r.TransactionID, 10);
     });
     safeArray(finished).forEach(r => {
         const key  = tKeyEff(r);
         const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
-        get(key, name).done++;
+        const g    = get(key, name);
+        const txId = r.TransactionID ? parseInt(r.TransactionID, 10) : 0;
+        if(!g.currentTxId || txId === g.currentTxId) g.done++;
     });
     return Array.from(map.values());
 }
