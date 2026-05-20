@@ -1,5 +1,13 @@
 # Changelog — Staff Display
 
+## [3.9.0] — 2026-05-20
+
+### แก้ไขบัค (Root Cause: POS ลบ ordertransactionfront เมื่อจ่ายเงิน)
+- **[BUG-ROOT]** ออเดอร์เก่าจาก session ที่ปิดบิลแล้วยังแสดงอยู่ในจอ KDS — สาเหตุที่แท้จริง: POS ระบบ**ลบ**แถวออกจาก `ordertransactionfront` เมื่อจ่ายเงิน (ไม่ได้ set status=7) ดังนั้น query เดิมที่ check `EXISTS(TransactionStatusID=7)` ไม่พบแถวใดเลย → `is_combined` ไม่ถูก set → ออเดอร์เก่าแสดงเป็น active
+  - **แก้**: เปลี่ยนทั้ง 3 จุด (`fetchActiveRows`, `fetchFinishedRows`, `fetchTableOrders`) จาก `EXISTS(status=7)` เป็น `NOT EXISTS(status≠7)` — ถ้า TransactionID > 0 แต่ไม่มีในตาราง `ordertransactionfront` เลย (หรือมีแต่ status=7) → ถือว่าจ่ายเงินไปแล้ว → `is_combined=true`
+
+---
+
 ## [3.8.0] — 2026-05-20
 
 ### แก้ไขบัค (จากการตรวจครั้งใหญ่)
