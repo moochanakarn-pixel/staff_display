@@ -197,6 +197,7 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         .tc-badge.kitchen{color:var(--secondary)}
         .tc-badge.done{color:var(--success)}
         .tc-badge.empty{color:#9ca3af}
+        .tc-badge.combined{color:#7c3aed}
 
         /* Modal */
         .modal-overlay{
@@ -458,7 +459,7 @@ function byZone(rows){
 function groupTables(active, finished){
     const map = new Map();
     function get(key, name){
-        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null,currentTxId:0});
+        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null,currentTxId:0,hasCombined:false});
         return map.get(key);
     }
     safeArray(active).forEach(r => {
@@ -466,6 +467,7 @@ function groupTables(active, finished){
         const key  = tKeyEff(r);
         const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
         const g    = get(key, name);
+        if(r.is_combined) g.hasCombined = true;
         if(!r.is_voided && !isNonKds(r)){
             g.pending++;
             g.worst = Math.max(g.worst, waitMin(r));
@@ -481,7 +483,9 @@ function groupTables(active, finished){
         if(isHidden(r)) return;
         const key  = tKeyEff(r);
         const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
-        get(key, name).done++;
+        const g    = get(key, name);
+        if(r.is_combined) g.hasCombined = true;
+        g.done++;
     });
     return Array.from(map.values());
 }
@@ -504,6 +508,7 @@ function buildCard(g){
     const badges = [];
     if(g.pending > 0) badges.push(`<div class="tc-badge kitchen">🍳 ${g.pending} กำลังทำ</div>`);
     if(g.done    > 0) badges.push(`<div class="tc-badge done">✅ ${g.done} เสร็จแล้ว</div>`);
+    if(g.hasCombined)  badges.push(`<div class="tc-badge combined">🔗 รวมโต๊ะแล้ว</div>`);
     const openStr = g.openTime
         ? g.openTime.toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'})
         : '';
@@ -566,7 +571,7 @@ function renderServeGrid(){
 }
 
 /* ── Modal ── */
-function isHidden(r){ return r.is_combined || r.is_old_session; }
+function isHidden(r){ return r.is_old_session; }
 function getTransactionId(key){
     const row = safeArray(state.active).find(r => tKeyEff(r) === key && !isHidden(r))
              || safeArray(state.finished).find(r => tKeyEff(r) === key && !isHidden(r))
@@ -688,10 +693,10 @@ function openModal(key, name){
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');
             const allRows = safeArray(json.rows);
-            // ใช้ is_old_session filter เฉพาะเมื่อมี session ใหม่จริงๆ (มี non-voided order ที่ไม่ถูก hide)
-            // ถ้าไม่มี → แสดงทั้งหมด (ยกเว้น is_combined) เพื่อป้องกัน false positive ที่เกิดจาก timing
-            const hasNewSession = allRows.some(r => !r.is_combined && !r.is_old_session && !r.is_voided);
-            const rows       = allRows.filter(r => hasNewSession ? !isHidden(r) : !r.is_combined);
+            // ซ่อนเฉพาะ is_old_session (session เก่าหลังจ่ายเงิน)
+            // is_combined (รวมโต๊ะ) ยังแสดงปกติ ครัวต้องเห็นทุกรายการ
+            const hasNewSession = allRows.some(r => !r.is_old_session && !r.is_voided);
+            const rows       = allRows.filter(r => hasNewSession ? !r.is_old_session : true);
             const pids       = Array.isArray(json.allowed_printer_ids) ? json.allowed_printer_ids : [];
             const printerSet = pids.length > 0 ? new Set(pids.map(Number)) : null;
             const nDone   = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return s===PS_DONE||s===PS_RESOLVED||nonKds(r,printerSet); }).length;

@@ -1,5 +1,17 @@
 # Changelog — Staff Display
 
+## [3.19.0] — 2026-05-20
+
+### แก้ไข (รวมโต๊ะแสดงผลถูกต้อง)
+- **[COMBINE-VISIBLE]** โต๊ะที่ถูกรวม (`is_combined=true`) เปลี่ยนจาก "ซ่อน" เป็น "แสดงพร้อม badge 🔗 รวมโต๊ะแล้ว" — ครัวเห็นออเดอร์ทุกรายการจากทุกโต๊ะที่รวมกัน
+  - `isHidden()` ตอนนี้คืน `is_old_session` เท่านั้น — `is_combined` ไม่ถูกซ่อนอีกต่อไป
+  - `groupTables`: เพิ่ม `hasCombined` flag ใน group object, `is_combined` orders ยังนับใน `g.pending` / `g.done` ปกติ
+  - `buildCard`: เพิ่ม badge `🔗 รวมโต๊ะแล้ว` (สีม่วง) เมื่อ `hasCombined=true`
+  - Modal: แสดง `is_combined` orders ตามปกติ กรองออกแค่ `is_old_session`
+  - เพิ่ม CSS `.tc-badge.combined` (สีม่วง `#7c3aed`)
+
+---
+
 ## [3.18.0] — 2026-05-20
 
 ### Security: ลบ write endpoints ออกจาก view-only display
