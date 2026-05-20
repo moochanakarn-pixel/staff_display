@@ -1,5 +1,18 @@
 # Changelog — Staff Display
 
+## [3.13.0] — 2026-05-20
+
+### แก้ไขบัค (Critical: is_combined ใช้ผิดความหมาย ทำให้ออเดอร์หายจากจอ)
+- **[BUG-ISCOMBINED]** `is_combined` ถูกนำไปใช้กับ "ออเดอร์จาก session เก่าหลังจ่ายเงิน" ซึ่งผิด — `is_combined` ควรหมายถึง **CombineBill (รวมโต๊ะ)** เท่านั้น (TransactionStatusID = 7 จาก POS)
+  - การใช้ `is_combined` ผิดความหมายนี้ทำให้ออเดอร์ปัจจุบันบางโต๊ะถูกซ่อนหายไป (false positive)
+  - **แก้ `api_checker.php`**: แยก CASE statement ออกเป็น 2 คอลัมน์
+    - `TransactionStatusID`: ตรวจ `EXISTS(status=7)` → 7 เท่านั้น (CombineBill จริงๆ)
+    - `IsOldSession` (ใหม่): `NOT EXISTS(status IN(1,7)) AND EXISTS(status=1 for TableID)` → 1 (ออเดอร์จาก session ก่อนหน้า หลังจ่ายเงินและมีลูกค้าใหม่เปิดโต๊ะแล้ว)
+  - **แก้ `attachCommentsToRows`**: เพิ่ม `is_old_session` flag แยกจาก `is_combined`
+  - **แก้ `staff_display.php`**: เพิ่ม helper `isHidden(r)` = `r.is_combined || r.is_old_session` ใช้แทนทุกจุดที่เคยใช้ `r.is_combined` เพื่อซ่อนออเดอร์เก่า
+
+---
+
 ## [3.12.0] — 2026-05-20
 
 ### แก้ไขบัค (Critical: ใช้ TransactionStatusID ผิดความหมาย)

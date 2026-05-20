@@ -482,19 +482,29 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', 
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
             CASE
                 WHEN opf.TransactionID > 0
+                 AND EXISTS(
+                     SELECT 1 FROM ordertransactionfront otf2
+                     WHERE otf2.TransactionID = opf.TransactionID
+                       AND otf2.TransactionStatusID = 7
+                 )
+                THEN 7
+                ELSE 0
+            END AS TransactionStatusID,
+            CASE
+                WHEN opf.TransactionID > 0
                  AND NOT EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
                      WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID = 1
+                       AND otf2.TransactionStatusID IN (1, 7)
                  )
                  AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf3
                      WHERE otf3.TableID = opf.TableID
                        AND otf3.TransactionStatusID = 1
                  )
-                THEN 7
+                THEN 1
                 ELSE 0
-            END AS TransactionStatusID";
+            END AS IsOldSession";
     $join = "LEFT JOIN salemode sm ON sm.SaleModeID = opf.SaleModeID AND sm.Deleted = 0";
     $order = "ORDER BY opf.SubmitOrderDateTime ASC, opf.ProcessID ASC, opf.SubProcessID ASC";
 
@@ -1126,19 +1136,29 @@ function fetchActiveRows($conn)
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
             CASE
                 WHEN opf.TransactionID > 0
+                 AND EXISTS(
+                     SELECT 1 FROM ordertransactionfront otf2
+                     WHERE otf2.TransactionID = opf.TransactionID
+                       AND otf2.TransactionStatusID = 7
+                 )
+                THEN 7
+                ELSE 0
+            END AS TransactionStatusID,
+            CASE
+                WHEN opf.TransactionID > 0
                  AND NOT EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
                      WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID = 1
+                       AND otf2.TransactionStatusID IN (1, 7)
                  )
                  AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf3
                      WHERE otf3.TableID = opf.TableID
                        AND otf3.TransactionStatusID = 1
                  )
-                THEN 7
+                THEN 1
                 ELSE 0
-            END AS TransactionStatusID
+            END AS IsOldSession
         FROM orderprocessdetailfront opf
         LEFT JOIN salemode sm
             ON sm.SaleModeID = opf.SaleModeID
@@ -1192,19 +1212,29 @@ function fetchFinishedRows($conn)
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
             CASE
                 WHEN opf.TransactionID > 0
+                 AND EXISTS(
+                     SELECT 1 FROM ordertransactionfront otf2
+                     WHERE otf2.TransactionID = opf.TransactionID
+                       AND otf2.TransactionStatusID = 7
+                 )
+                THEN 7
+                ELSE 0
+            END AS TransactionStatusID,
+            CASE
+                WHEN opf.TransactionID > 0
                  AND NOT EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
                      WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID = 1
+                       AND otf2.TransactionStatusID IN (1, 7)
                  )
                  AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf3
                      WHERE otf3.TableID = opf.TableID
                        AND otf3.TransactionStatusID = 1
                  )
-                THEN 7
+                THEN 1
                 ELSE 0
-            END AS TransactionStatusID
+            END AS IsOldSession
         FROM orderprocessdetailfront opf
         LEFT JOIN salemode sm
             ON sm.SaleModeID = opf.SaleModeID
@@ -1232,14 +1262,16 @@ function attachCommentsToRows($conn, $rows)
 
     // คำนวณ flag สถานะพิเศษแต่ละ row
     foreach ($rows as &$row) {
-        $status   = isset($row['ProcessStatus'])      ? (int)$row['ProcessStatus']      : 0;
-        $isMoved  = isset($row['IsMoveOrder'])         ? (int)$row['IsMoveOrder']         : 0;
-        $txStatus = isset($row['TransactionStatusID']) ? (int)$row['TransactionStatusID'] : 0;
-        $dispName = isset($row['DisplayTableName'])    ? trim((string)$row['DisplayTableName']) : '';
+        $status     = isset($row['ProcessStatus'])      ? (int)$row['ProcessStatus']      : 0;
+        $isMoved    = isset($row['IsMoveOrder'])         ? (int)$row['IsMoveOrder']         : 0;
+        $txStatus   = isset($row['TransactionStatusID']) ? (int)$row['TransactionStatusID'] : 0;
+        $oldSession = isset($row['IsOldSession'])        ? (int)$row['IsOldSession']        : 0;
+        $dispName   = isset($row['DisplayTableName'])    ? trim((string)$row['DisplayTableName']) : '';
 
-        $row['is_voided']   = ($status === (int)PROCESS_STATUS_VOIDED);
-        $row['is_moved']    = ($isMoved === 1 && strpos($dispName, '->') !== false);
-        $row['is_combined'] = (!$row['is_voided'] && !$row['is_moved'] && $txStatus === 7);
+        $row['is_voided']      = ($status === (int)PROCESS_STATUS_VOIDED);
+        $row['is_moved']       = ($isMoved === 1 && strpos($dispName, '->') !== false);
+        $row['is_combined']    = (!$row['is_voided'] && !$row['is_moved'] && $txStatus === 7);
+        $row['is_old_session'] = (!$row['is_voided'] && !$row['is_moved'] && !$row['is_combined'] && $oldSession === 1);
 
         // ปลายทางของ move: '2->4' → '4'
         $row['moved_to'] = '';

@@ -462,7 +462,7 @@ function groupTables(active, finished){
         return map.get(key);
     }
     safeArray(active).forEach(r => {
-        if(r.is_combined) return;
+        if(isHidden(r)) return;
         const key  = tKeyEff(r);
         const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
         const g    = get(key, name);
@@ -478,7 +478,7 @@ function groupTables(active, finished){
         }
     });
     safeArray(finished).forEach(r => {
-        if(r.is_combined) return;
+        if(isHidden(r)) return;
         const key  = tKeyEff(r);
         const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
         get(key, name).done++;
@@ -566,23 +566,24 @@ function renderServeGrid(){
 }
 
 /* ── Modal ── */
+function isHidden(r){ return r.is_combined || r.is_old_session; }
 function getTransactionId(key){
-    const row = safeArray(state.active).find(r => tKeyEff(r) === key && !r.is_combined)
-             || safeArray(state.finished).find(r => tKeyEff(r) === key && !r.is_combined)
+    const row = safeArray(state.active).find(r => tKeyEff(r) === key && !isHidden(r))
+             || safeArray(state.finished).find(r => tKeyEff(r) === key && !isHidden(r))
              || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.TransactionID ? parseInt(row.TransactionID, 10) : 0;
 }
 function getOrderDate(key){
-    const row = safeArray(state.active).find(r => tKeyEff(r) === key && !r.is_combined)
-             || safeArray(state.finished).find(r => tKeyEff(r) === key && !r.is_combined)
+    const row = safeArray(state.active).find(r => tKeyEff(r) === key && !isHidden(r))
+             || safeArray(state.finished).find(r => tKeyEff(r) === key && !isHidden(r))
              || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.OrderDate ? String(row.OrderDate).slice(0,10) : '';
 }
-// หาเวลาเริ่มออเดอร์แรกสุดของ session ปัจจุบัน (จาก non-combined rows ใน state)
+// หาเวลาเริ่มออเดอร์แรกสุดของ session ปัจจุบัน (จาก non-hidden rows ใน state)
 function getSessionStart(key){
     const rows = [
-        ...safeArray(state.active).filter(r => tKeyEff(r) === key && !r.is_combined),
-        ...safeArray(state.finished).filter(r => tKeyEff(r) === key && !r.is_combined),
+        ...safeArray(state.active).filter(r => tKeyEff(r) === key && !isHidden(r)),
+        ...safeArray(state.finished).filter(r => tKeyEff(r) === key && !isHidden(r)),
     ];
     if(!rows.length) return '';
     return rows.reduce((min, r) => {
@@ -686,7 +687,7 @@ function openModal(key, name){
         .then(r => r.json())
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');
-            const rows       = safeArray(json.rows).filter(r => !r.is_combined);
+            const rows       = safeArray(json.rows).filter(r => !isHidden(r));
             const pids       = Array.isArray(json.allowed_printer_ids) ? json.allowed_printer_ids : [];
             const printerSet = pids.length > 0 ? new Set(pids.map(Number)) : null;
             const nDone   = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return s===PS_DONE||s===PS_RESOLVED||nonKds(r,printerSet); }).length;
@@ -767,7 +768,7 @@ async function loadAll(){
             const pids = Array.isArray(ar.allowed_printer_ids) ? ar.allowed_printer_ids : [];
             state.allowedPrinters = pids.length > 0 ? new Set(pids.map(Number)) : null;
             setDot('');
-            const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!r.is_combined&&!isNonKds(r)).length;
+            const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!isHidden(r)&&!isNonKds(r)).length;
             document.title = pending > 0 ? `(${pending}) Staff Display` : 'Staff Display';
         }
         renderGrid();
