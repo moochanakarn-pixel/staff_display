@@ -1,5 +1,15 @@
 # Changelog — Staff Display
 
+## [3.11.0] — 2026-05-20
+
+### แก้ไขบัค
+- **Modal ยังเห็นประวัติออเดอร์ผสมเก่า-ใหม่** — `is_combined` กรองได้แค่กรณีที่โต๊ะมีใน `ordertransactionfront` แต่ร้านที่ตารางนั้นไม่ครบ (เช่น sushiseki) จะยังเห็นออเดอร์เก่า
+  - **Frontend** (`staff_display.php`): เพิ่ม `getSessionStart(key)` — หาเวลา `SubmitOrderDateTime` แรกสุดจาก non-combined rows ใน `state` สำหรับโต๊ะนั้น แล้วส่งเป็น `session_start` parameter ไปยัง modal API
+  - **Backend** (`api_checker.php`): `fetchTableOrders` รับ `session_start` parameter — เพิ่ม `AND opf.SubmitOrderDateTime >= ?` ใน WHERE clause ทำให้ modal แสดงเฉพาะออเดอร์ตั้งแต่ session ปัจจุบันเริ่มต้น (ไม่มีออเดอร์ลูกค้าก่อนหน้า)
+  - ทำงานถูกต้องทั้งกรณี `ordertransactionfront` ครบและไม่ครบ
+
+---
+
 ## [3.10.0] — 2026-05-20
 
 ### แก้ไขบัค (Critical: ออเดอร์ active หายออกจากจอ)

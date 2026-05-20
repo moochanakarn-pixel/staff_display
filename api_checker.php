@@ -438,13 +438,14 @@ function listTableOrders($conn)
     $tableId       = requestString('table_id', '');
     $transactionId = requestInt('transaction_id', 0);
     $orderDate     = requestString('order_date', '');
+    $sessionStart  = requestString('session_start', '');
     if ($tableId === '') {
         jsonResponse(array('success' => false, 'error' => 'table_id required'));
         return;
     }
     $cid = getEffectiveComputerId();
     writeUsageLog('TABLE_OPEN', ['table_id' => $tableId, 'cid' => $cid]);
-    $rows            = fetchTableOrders($conn, $tableId, $transactionId, $orderDate);
+    $rows            = fetchTableOrders($conn, $tableId, $transactionId, $orderDate, $sessionStart);
     $allowedPrinters = fetchAllowedPrinterIds($conn, $cid);
     jsonResponse(array(
         'success'             => true,
@@ -455,7 +456,7 @@ function listTableOrders($conn)
     ));
 }
 
-function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '')
+function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', $sessionStart = '')
 {
     $selectCols = "
             opf.ProcessID,
@@ -497,21 +498,35 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '')
     $join = "LEFT JOIN salemode sm ON sm.SaleModeID = opf.SaleModeID AND sm.Deleted = 0";
     $order = "ORDER BY opf.SubmitOrderDateTime ASC, opf.ProcessID ASC, opf.SubProcessID ASC";
 
+    // session_start กรองเฉพาะออเดอร์ของ session ปัจจุบัน (ไม่รวม session เก่าของลูกค้าก่อนหน้า)
+    $sessionFilter = '';
+    if ($sessionStart !== '' && $transactionId === 0) {
+        $sessionFilter = ' AND opf.SubmitOrderDateTime >= ?';
+    }
+
     if ($transactionId > 0) {
         $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.TransactionID = ? $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
         $stmt->bind_param('si', $tableId, $transactionId);
     } elseif ($orderDate !== '') {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = ? $order";
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = ?$sessionFilter $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
-        $stmt->bind_param('ss', $tableId, $orderDate);
+        if ($sessionFilter !== '') {
+            $stmt->bind_param('sss', $tableId, $orderDate, $sessionStart);
+        } else {
+            $stmt->bind_param('ss', $tableId, $orderDate);
+        }
     } else {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = CURDATE() $order";
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = CURDATE()$sessionFilter $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
-        $stmt->bind_param('s', $tableId);
+        if ($sessionFilter !== '') {
+            $stmt->bind_param('ss', $tableId, $sessionStart);
+        } else {
+            $stmt->bind_param('s', $tableId);
+        }
     }
 
     $stmt->execute();

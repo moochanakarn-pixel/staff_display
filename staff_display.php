@@ -578,6 +578,18 @@ function getOrderDate(key){
              || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.OrderDate ? String(row.OrderDate).slice(0,10) : '';
 }
+// หาเวลาเริ่มออเดอร์แรกสุดของ session ปัจจุบัน (จาก non-combined rows ใน state)
+function getSessionStart(key){
+    const rows = [
+        ...safeArray(state.active).filter(r => tKeyEff(r) === key && !r.is_combined),
+        ...safeArray(state.finished).filter(r => tKeyEff(r) === key && !r.is_combined),
+    ];
+    if(!rows.length) return '';
+    return rows.reduce((min, r) => {
+        const t = r.SubmitOrderDateTime || '';
+        return t && (!min || t < min) ? t : min;
+    }, '');
+}
 function buildRow(row, printerSet){
     const st       = parseInt(row.ProcessStatus, 10);
     const autoDone = nonKds(row, printerSet);
@@ -668,7 +680,9 @@ function openModal(key, name){
     const txParam = txId > 0 ? '&transaction_id=' + txId : '';
     const od      = getOrderDate(key);
     const odParam = !txParam && od ? '&order_date=' + encodeURIComponent(od) : '';
-    fetch('api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + txParam + odParam + cidParam + '&_=' + Date.now(), {cache:'no-store', signal:msig})
+    const ss      = !txParam ? getSessionStart(key) : '';
+    const ssParam = ss ? '&session_start=' + encodeURIComponent(ss) : '';
+    fetch('api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + txParam + odParam + ssParam + cidParam + '&_=' + Date.now(), {cache:'no-store', signal:msig})
         .then(r => r.json())
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');
