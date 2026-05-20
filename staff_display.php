@@ -242,6 +242,10 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         .r-active .or-name{color:#0f2945}
         .r-voided .or-name{color:#9ca3af;text-decoration:line-through}
         .or-time{font-size:11px;color:var(--muted);margin-top:2px}
+        .or-elapsed{font-size:11px;font-weight:bold;margin-top:1px}
+        .or-elapsed.el-ok{color:var(--success)}
+        .or-elapsed.el-warn{color:#d97706}
+        .or-elapsed.el-late{color:#dc2626}
         .or-right{text-align:right;flex-shrink:0}
         .or-qty{font-size:18px;font-weight:bold}
         .r-done   .or-qty{color:var(--success)}
@@ -437,6 +441,24 @@ function waitMin(row){
     const d = new Date(String(row.SubmitOrderDateTime||'').replace(' ','T'));
     return isNaN(d) ? 0 : Math.max(0,Math.floor((Date.now()-d)/60000));
 }
+function cookMin(row){
+    const start = new Date(String(row.SubmitOrderDateTime||'').replace(' ','T'));
+    if(isNaN(start)) return -1;
+    const end = row.FinishDateTime
+        ? new Date(String(row.FinishDateTime).replace(' ','T'))
+        : new Date();
+    return Math.max(0, Math.floor((end - start) / 60000));
+}
+function elapsedBadge(row, done, voided){
+    if(voided) return '';
+    const m = cookMin(row);
+    if(m < 0) return '';
+    if(done){
+        return `<div class="or-elapsed el-ok">⏱ เสร็จใน ${m} นาที</div>`;
+    }
+    const cls = m >= T_RED ? 'el-late' : m >= T_YELLOW ? 'el-warn' : 'el-ok';
+    return `<div class="or-elapsed ${cls}">🕒 ${m} นาที</div>`;
+}
 function tKey(row){ return String(row.TableID || row.DisplayTableName || '-'); }
 // สำหรับ order ย้ายโต๊ะ: ถ้า TableID ว่าง ให้ใช้ moved_to (ปลายทาง) แทน DisplayTableName "2->4"
 function tKeyEff(row){
@@ -613,6 +635,7 @@ function buildRow(row, printerSet){
         <div>
             <div class="or-name">${name}</div>
             <div class="or-time">${time}</div>
+            ${elapsedBadge(row, done, voided)}
         </div>
         <div class="or-right">
             <div class="or-qty">x${fmtQty(row.ProductAmount)}</div>
