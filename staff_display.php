@@ -471,7 +471,7 @@ function groupTables(active, finished){
         } else if(!r.is_voided && !r.is_combined && isNonKds(r)){
             g.done++;
         }
-        if(r.SubmitOrderDateTime){
+        if(!r.is_combined && r.SubmitOrderDateTime){
             const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
             if(!isNaN(t) && (g.openTime === null || t < g.openTime)) g.openTime = t;
         }
