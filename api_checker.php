@@ -288,6 +288,18 @@ try {
     $method = requestedMethod();
     $action = requestedAction();
 
+    // staff_display เป็น view-only — block ทุก write action
+    $blockedActions = [
+        'checkout_one', 'confirm_one', 'undo_one', 'resolve_status',
+        'checkout_barcode', 'set_product_out_of_stock',
+        'save_system_settings', 'test_system_settings_connection',
+    ];
+    if (in_array($action, $blockedActions, true)) {
+        http_response_code(403);
+        jsonResponse(['success' => false, 'error' => 'Not allowed on this display']);
+        exit;
+    }
+
     if ($method === 'GET' && $action === 'get_system_settings') {
         handleGetSystemSettings();
     }
@@ -296,38 +308,10 @@ try {
         handleLookupStaffName();
     }
 
-    if ($method === 'POST' && $action === 'test_system_settings_connection') {
-        handleTestSystemSettingsConnection();
-    }
-
-    if ($method === 'POST' && $action === 'save_system_settings') {
-        handleSaveSystemSettings();
-    }
-
     $conn = getDbConnection();
 
     if ($method === 'POST' && $action === 'lookup_staff') {
         lookupStaff($conn);
-    }
-
-    if ($method === 'POST' && $action === 'confirm_one') {
-        confirmOne($conn);
-    }
-
-    if ($method === 'POST' && $action === 'checkout_one') {
-        checkoutOne($conn);
-    }
-
-    if ($method === 'POST' && $action === 'checkout_barcode') {
-        checkoutBarcode($conn);
-    }
-
-    if ($method === 'POST' && $action === 'undo_one') {
-        undoOne($conn);
-    }
-
-    if ($method === 'POST' && $action === 'resolve_status') {
-        resolveStatus($conn);
     }
 
     if ($method === 'GET' && $action === 'list_serve_view') {
@@ -364,10 +348,6 @@ try {
 
     if ($method === 'GET' && $action === 'list_out_of_stock_products') {
         listOutOfStockProducts($conn);
-    }
-
-    if ($method === 'POST' && $action === 'set_product_out_of_stock') {
-        setProductOutOfStock($conn);
     }
 
     if ($method === 'GET' && ($action === 'list' || $action === '')) {

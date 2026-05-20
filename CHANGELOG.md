@@ -1,5 +1,15 @@
 # Changelog — Staff Display
 
+## [3.18.0] — 2026-05-20
+
+### Security: ลบ write endpoints ออกจาก view-only display
+- **[SECURITY]** `staff_display` เป็นจอ view-only — ไม่ควรมี write operations ใดๆ
+- เพิ่ม blocklist ที่ต้นของ routing ใน `api_checker.php`: `checkout_one`, `confirm_one`, `undo_one`, `resolve_status`, `checkout_barcode`, `set_product_out_of_stock`, `save_system_settings`, `test_system_settings_connection` → return **HTTP 403** ทันที
+- ลบ `if` routing blocks ของ write actions ออกให้สะอาด
+- Actions ที่เหลือเป็น GET read-only ทั้งหมด + `lookup_staff` (POST สำหรับระบุตัวตน)
+
+---
+
 ## [3.17.0] — 2026-05-20
 
 ### แก้ไขบัค (is_combined ไม่ทำงานเมื่อ TransactionID = 0)
