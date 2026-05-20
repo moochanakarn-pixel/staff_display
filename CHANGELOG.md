@@ -1,5 +1,14 @@
 # Changelog — Staff Display
 
+## [3.7.0] — 2026-05-20
+
+### แก้ไขบัค
+- **Session เก่าหายออกจากการ์ดเมื่อโต๊ะเปิด session ใหม่**
+  - `fetchFinishedRows` (`api_checker.php`) — เพิ่ม `TransactionStatusID` subquery เดียวกับ `fetchActiveRows` เพื่อให้ finished items ของ transaction ที่ปิดแล้วได้รับ flag `is_combined=true`
+  - `groupTables` (`staff_display.php`) — ข้าม `is_combined` rows ทั้ง active และ finished ทำให้โต๊ะที่ปิดบิลไปแล้วหายออกจากจอ และถ้ามีลูกค้าใหม่นั่งก็แสดงเฉพาะ session ใหม่เท่านั้น
+
+---
+
 ## [3.6.0] — 2026-05-20
 
 ### แก้ไขบัค

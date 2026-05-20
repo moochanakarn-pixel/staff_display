@@ -1144,7 +1144,16 @@ function fetchFinishedRows($conn)
             opf.ProcessStatus,
             opf.SaleModeID,
             opf.FinishStaffID,
-            COALESCE(sm.SaleModeName, '-') AS SaleModeName
+            COALESCE(sm.SaleModeName, '-') AS SaleModeName,
+            CASE
+                WHEN opf.TransactionID > 0 AND EXISTS(
+                    SELECT 1 FROM ordertransactionfront otf2
+                    WHERE otf2.TransactionID = opf.TransactionID
+                      AND otf2.TransactionStatusID = 7
+                )
+                THEN 7
+                ELSE 0
+            END AS TransactionStatusID
         FROM orderprocessdetailfront opf
         LEFT JOIN salemode sm
             ON sm.SaleModeID = opf.SaleModeID

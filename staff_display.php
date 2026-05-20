@@ -462,27 +462,26 @@ function groupTables(active, finished){
         return map.get(key);
     }
     safeArray(active).forEach(r => {
+        if(r.is_combined) return;
         const key  = tKeyEff(r);
         const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
         const g    = get(key, name);
-        if(!r.is_voided && !r.is_combined && !isNonKds(r)){
+        if(!r.is_voided && !isNonKds(r)){
             g.pending++;
             g.worst = Math.max(g.worst, waitMin(r));
-        } else if(!r.is_voided && !r.is_combined && isNonKds(r)){
+        } else if(!r.is_voided && isNonKds(r)){
             g.done++;
         }
-        if(!r.is_combined && r.SubmitOrderDateTime){
+        if(r.SubmitOrderDateTime){
             const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
             if(!isNaN(t) && (g.openTime === null || t < g.openTime)) g.openTime = t;
         }
-        if(!r.is_combined && r.TransactionID > 0) g.currentTxId = parseInt(r.TransactionID, 10);
     });
     safeArray(finished).forEach(r => {
+        if(r.is_combined) return;
         const key  = tKeyEff(r);
         const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
-        const g    = get(key, name);
-        const txId = r.TransactionID ? parseInt(r.TransactionID, 10) : 0;
-        if(!g.currentTxId || txId === g.currentTxId) g.done++;
+        get(key, name).done++;
     });
     return Array.from(map.values());
 }
