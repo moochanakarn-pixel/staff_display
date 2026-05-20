@@ -488,8 +488,9 @@ function groupTables(active, finished){
 
 /* ── Table Card ── */
 function cardCls(g){
-    if(g.isEmpty)          return 's-empty';
-    if(g.pending === 0)    return 's-done';
+    if(g.isEmpty)                        return 's-empty';
+    if(g.pending === 0 && g.done === 0)  return 's-empty';
+    if(g.pending === 0)                  return 's-done';
     if(g.worst >= T_RED)   return 's-red';
     if(g.worst >= T_YELLOW)return 's-yellow';
     return '';
@@ -567,13 +568,13 @@ function renderServeGrid(){
 /* ── Modal ── */
 function getTransactionId(key){
     const row = safeArray(state.active).find(r => tKeyEff(r) === key && !r.is_combined)
-             || safeArray(state.active).find(r => tKeyEff(r) === key)
+             || safeArray(state.finished).find(r => tKeyEff(r) === key && !r.is_combined)
              || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.TransactionID ? parseInt(row.TransactionID, 10) : 0;
 }
 function getOrderDate(key){
     const row = safeArray(state.active).find(r => tKeyEff(r) === key && !r.is_combined)
-             || safeArray(state.active).find(r => tKeyEff(r) === key)
+             || safeArray(state.finished).find(r => tKeyEff(r) === key && !r.is_combined)
              || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.OrderDate ? String(row.OrderDate).slice(0,10) : '';
 }

@@ -1,5 +1,16 @@
 # Changelog — Staff Display
 
+## [3.8.0] — 2026-05-20
+
+### แก้ไขบัค (จากการตรวจครั้งใหญ่)
+- **[BUG-01]** `fetchFinishedRows` ขาด `opf.IsMoveOrder` — `is_moved` เป็น false เสมอสำหรับ finished rows ทำให้ moved order ที่ปิดบิลถูก set `is_combined` แทน `is_moved`
+- **[BUG-02]** `fetchTableOrders` (modal) ขาด `TransactionStatusID` subquery — modal fallback (order_date filter) แสดง rows ทุก session รวม session เก่าที่ปิดบิลแล้ว
+- **[BUG-04]** Connection leak ใน `handleTestSystemSettingsConnection` / `handleSaveSystemSettings` — ถ้า `lookupStaffDisplayNameByConnection` throw ขณะที่ `$conn` เปิดอยู่ connection จะไม่ถูกปิด แก้ด้วย try/finally
+- **[BUG-07]** โต๊ะที่มีแต่ order ยกเลิก (voided) แสดงเป็นสีเขียว s-done — `cardCls()` คืน `s-done` เมื่อ `pending=0` แม้ `done=0` ด้วย แก้: `pending=0 && done=0` → `s-empty`
+- **[BUG-11]** `getTransactionId()` / `getOrderDate()` fallback ที่ 2 ไม่กรอง `is_combined` — อาจดึง TransactionID ของ session เก่ามา แก้: ใช้ `state.finished` (กรอง `!is_combined`) แทน fallback ที่ 2
+
+---
+
 ## [3.7.0] — 2026-05-20
 
 ### แก้ไขบัค

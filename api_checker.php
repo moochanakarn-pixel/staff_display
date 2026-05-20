@@ -235,10 +235,14 @@ function handleTestSystemSettingsConnection()
         jsonResponse(array('success' => false, 'error' => implode(' | ', $errors)), 422);
     }
 
+    $staffName = '';
     try {
         $conn = connectWithSystemSettings($settings);
-        $staffName = lookupStaffDisplayNameByConnection($conn, $settings['finish_staff_id']);
-        $conn->close();
+        try {
+            $staffName = lookupStaffDisplayNameByConnection($conn, $settings['finish_staff_id']);
+        } finally {
+            $conn->close();
+        }
     } catch (Throwable $e) {
         jsonResponse(array('success' => false, 'error' => $e->getMessage()), 422);
     }
@@ -258,10 +262,14 @@ function handleSaveSystemSettings()
         jsonResponse(array('success' => false, 'error' => implode(' | ', $errors)), 422);
     }
 
+    $staffName = '';
     try {
         $conn = connectWithSystemSettings($settings);
-        $staffName = lookupStaffDisplayNameByConnection($conn, $settings['finish_staff_id']);
-        $conn->close();
+        try {
+            $staffName = lookupStaffDisplayNameByConnection($conn, $settings['finish_staff_id']);
+        } finally {
+            $conn->close();
+        }
         writeSystemSettingsFile($settings);
     } catch (Throwable $e) {
         jsonResponse(array('success' => false, 'error' => $e->getMessage()), 422);
@@ -470,7 +478,16 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '')
             opf.DisplayTableName,
             opf.ProcessStatus,
             opf.SaleModeID,
-            COALESCE(sm.SaleModeName, '-') AS SaleModeName";
+            COALESCE(sm.SaleModeName, '-') AS SaleModeName,
+            CASE
+                WHEN opf.TransactionID > 0 AND EXISTS(
+                    SELECT 1 FROM ordertransactionfront otf2
+                    WHERE otf2.TransactionID = opf.TransactionID
+                      AND otf2.TransactionStatusID = 7
+                )
+                THEN 7
+                ELSE 0
+            END AS TransactionStatusID";
     $join = "LEFT JOIN salemode sm ON sm.SaleModeID = opf.SaleModeID AND sm.Deleted = 0";
     $order = "ORDER BY opf.SubmitOrderDateTime ASC, opf.ProcessID ASC, opf.SubProcessID ASC";
 
@@ -1142,6 +1159,7 @@ function fetchFinishedRows($conn)
             opf.TableID,
             opf.DisplayTableName,
             opf.ProcessStatus,
+            opf.IsMoveOrder,
             opf.SaleModeID,
             opf.FinishStaffID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
