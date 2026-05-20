@@ -672,7 +672,7 @@ function openModal(key, name){
         .then(r => r.json())
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');
-            const rows       = safeArray(json.rows);
+            const rows       = safeArray(json.rows).filter(r => !r.is_combined);
             const pids       = Array.isArray(json.allowed_printer_ids) ? json.allowed_printer_ids : [];
             const printerSet = pids.length > 0 ? new Set(pids.map(Number)) : null;
             const nDone   = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return s===PS_DONE||s===PS_RESOLVED||nonKds(r,printerSet); }).length;

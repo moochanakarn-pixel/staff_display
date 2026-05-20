@@ -1,5 +1,12 @@
 # Changelog — Staff Display
 
+## [3.9.1] — 2026-05-20
+
+### แก้ไขบัค
+- **Modal แสดงออเดอร์โต๊ะเก่า** (`staff_display.php`) — หน้าหลักแสดงถูกแล้ว แต่พอกดเข้าไปดูรายละเอียดยังเห็นออเดอร์จาก session เก่าอยู่ เนื่องจาก modal ไม่ได้ filter `is_combined` rows ออกก่อน render แก้: เพิ่ม `.filter(r => !r.is_combined)` ก่อนแสดงผลใน modal
+
+---
+
 ## [3.9.0] — 2026-05-20
 
 ### แก้ไขบัค (Root Cause: POS ลบ ordertransactionfront เมื่อจ่ายเงิน)
