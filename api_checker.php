@@ -1086,15 +1086,15 @@ function fetchActiveRows($conn)
             opf.IsMoveOrder,
             opf.SaleModeID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
-            COALESCE(
-                (SELECT otf2.TransactionStatusID
-                 FROM ordertransactionfront otf2
-                 WHERE otf2.TableID = opf.TableID
-                   AND otf2.ComputerID = opf.ComputerID
-                   AND otf2.TransactionStatusID = 7
-                   AND DATE(otf2.OpenTime) = opf.OrderDate
-                 LIMIT 1),
-            0) AS TransactionStatusID
+            CASE
+                WHEN opf.TransactionID > 0 AND EXISTS(
+                    SELECT 1 FROM ordertransactionfront otf2
+                    WHERE otf2.TransactionID = opf.TransactionID
+                      AND otf2.TransactionStatusID = 7
+                )
+                THEN 7
+                ELSE 0
+            END AS TransactionStatusID
         FROM orderprocessdetailfront opf
         LEFT JOIN salemode sm
             ON sm.SaleModeID = opf.SaleModeID

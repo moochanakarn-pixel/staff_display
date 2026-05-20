@@ -1,5 +1,14 @@
 # Changelog — Staff Display
 
+## [3.3.0] — 2026-05-20
+
+### แก้ไขบัค
+- **ลูกค้าใหม่นั่งโต๊ะเดิมวันเดียวกัน — orders หายออกจาก KDS** (`api_checker.php`)
+  - **บัคเดิม**: subquery ตรวจ `is_combined` ใช้ `TableID + ComputerID + OrderDate` → พอลูกค้าเก่าชำระเงินแล้ว (status=7) ลูกค้าใหม่ที่โต๊ะเดียวกันวันนั้นก็โดน `is_combined=true` ทำให้ orders ใหม่หายออกจากจอครัวทั้งหมด
+  - **แก้ไข**: เปลี่ยนเป็น `CASE WHEN opf.TransactionID > 0 AND EXISTS(... WHERE otf2.TransactionID = opf.TransactionID ...)` ผูก is_combined กับ TransactionID ของ order นั้นโดยตรง ไม่ใช่ระดับโต๊ะ+วัน
+
+---
+
 ## [3.2.0] — 2026-05-20
 
 ### เพิ่มใหม่
