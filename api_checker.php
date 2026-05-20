@@ -492,10 +492,10 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', 
             END AS TransactionStatusID,
             CASE
                 WHEN opf.TransactionID > 0
-                 AND NOT EXISTS(
+                 AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
                      WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID IN (1, 7)
+                       AND otf2.TransactionStatusID = 2
                  )
                  AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf3
@@ -1146,10 +1146,10 @@ function fetchActiveRows($conn)
             END AS TransactionStatusID,
             CASE
                 WHEN opf.TransactionID > 0
-                 AND NOT EXISTS(
+                 AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
                      WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID IN (1, 7)
+                       AND otf2.TransactionStatusID = 2
                  )
                  AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf3
@@ -1222,10 +1222,10 @@ function fetchFinishedRows($conn)
             END AS TransactionStatusID,
             CASE
                 WHEN opf.TransactionID > 0
-                 AND NOT EXISTS(
+                 AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
                      WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID IN (1, 7)
+                       AND otf2.TransactionStatusID = 2
                  )
                  AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf3

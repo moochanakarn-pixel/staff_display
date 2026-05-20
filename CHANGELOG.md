@@ -1,5 +1,15 @@
 # Changelog — Staff Display
 
+## [3.15.0] — 2026-05-20
+
+### แก้ไข (IsOldSession ใช้ status ที่ถูกต้อง)
+- **[SIMPLIFY-STATUS]** `IsOldSession` เปลี่ยนจาก `NOT EXISTS(status IN(1,7))` เป็น `EXISTS(status=2)` ตรงๆ
+  - Status ที่สำคัญมีแค่ 2 ค่า: **1 = OpenBill** (เปิดอยู่), **2 = CloseBill** (จ่ายเงินแล้ว)
+  - ออเดอร์จาก session เก่า = TransactionID มี status=2 (CloseBill) ใน `ordertransactionfront` **และ** โต๊ะนั้นมี TransactionID ใหม่ที่ status=1 (OpenBill) อยู่แล้ว
+  - ลบ `NOT EXISTS` ออก ทำให้ logic ชัดเจนขึ้นและไม่เกิด false positive จากกรณีที่ TransactionID ไม่อยู่ใน `ordertransactionfront` เลย (เช่น ini76 ที่ลบ record ทิ้ง)
+
+---
+
 ## [3.14.0] — 2026-05-20
 
 ### แก้ไขบัค (Modal แสดงเฉพาะออเดอร์ยกเลิก)
