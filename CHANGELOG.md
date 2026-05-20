@@ -1,5 +1,14 @@
 # Changelog — Staff Display
 
+## [3.10.0] — 2026-05-20
+
+### แก้ไขบัค (Critical: ออเดอร์ active หายออกจากจอ)
+- **[BUG-CRITICAL]** `NOT EXISTS` ที่แก้ไว้ใน v3.9.0 กว้างเกินไป — `ordertransactionfront` ไม่ได้เก็บ transaction ทุกตัว (พบว่า sushiseki มีแค่ 3 records สำหรับ 3 โต๊ะ ขณะที่ KDS มีออเดอร์จาก 18+ TransactionIDs) ทำให้ออเดอร์ active จริงๆ 30+ rows ถูกซ่อนหายไป
+  - **Root cause**: `ordertransactionfront` เก็บเฉพาะ session ที่ "เปิดอยู่" บางส่วน ไม่ใช่ทุก transaction
+  - **แก้**: เพิ่มเงื่อนไขที่ 2 — ซ่อนออเดอร์เก่าเฉพาะเมื่อ **มีหลักฐานว่าโต๊ะนี้เปิด session ใหม่แล้ว** (`AND EXISTS(otf3 WHERE TableID = opf.TableID AND status≠7)`) ทำให้ซ่อนออเดอร์เก่าเฉพาะตอนที่รู้ชัดว่ามีลูกค้าใหม่มาแทนแล้วเท่านั้น
+
+---
+
 ## [3.9.1] — 2026-05-20
 
 ### แก้ไขบัค

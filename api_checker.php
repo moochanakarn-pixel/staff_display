@@ -480,11 +480,17 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '')
             opf.SaleModeID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
             CASE
-                WHEN opf.TransactionID > 0 AND NOT EXISTS(
-                    SELECT 1 FROM ordertransactionfront otf2
-                    WHERE otf2.TransactionID = opf.TransactionID
-                      AND otf2.TransactionStatusID <> 7
-                )
+                WHEN opf.TransactionID > 0
+                 AND NOT EXISTS(
+                     SELECT 1 FROM ordertransactionfront otf2
+                     WHERE otf2.TransactionID = opf.TransactionID
+                       AND otf2.TransactionStatusID <> 7
+                 )
+                 AND EXISTS(
+                     SELECT 1 FROM ordertransactionfront otf3
+                     WHERE otf3.TableID = opf.TableID
+                       AND otf3.TransactionStatusID <> 7
+                 )
                 THEN 7
                 ELSE 0
             END AS TransactionStatusID";
@@ -1104,11 +1110,17 @@ function fetchActiveRows($conn)
             opf.SaleModeID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
             CASE
-                WHEN opf.TransactionID > 0 AND NOT EXISTS(
-                    SELECT 1 FROM ordertransactionfront otf2
-                    WHERE otf2.TransactionID = opf.TransactionID
-                      AND otf2.TransactionStatusID <> 7
-                )
+                WHEN opf.TransactionID > 0
+                 AND NOT EXISTS(
+                     SELECT 1 FROM ordertransactionfront otf2
+                     WHERE otf2.TransactionID = opf.TransactionID
+                       AND otf2.TransactionStatusID <> 7
+                 )
+                 AND EXISTS(
+                     SELECT 1 FROM ordertransactionfront otf3
+                     WHERE otf3.TableID = opf.TableID
+                       AND otf3.TransactionStatusID <> 7
+                 )
                 THEN 7
                 ELSE 0
             END AS TransactionStatusID
@@ -1164,11 +1176,17 @@ function fetchFinishedRows($conn)
             opf.FinishStaffID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
             CASE
-                WHEN opf.TransactionID > 0 AND NOT EXISTS(
-                    SELECT 1 FROM ordertransactionfront otf2
-                    WHERE otf2.TransactionID = opf.TransactionID
-                      AND otf2.TransactionStatusID <> 7
-                )
+                WHEN opf.TransactionID > 0
+                 AND NOT EXISTS(
+                     SELECT 1 FROM ordertransactionfront otf2
+                     WHERE otf2.TransactionID = opf.TransactionID
+                       AND otf2.TransactionStatusID <> 7
+                 )
+                 AND EXISTS(
+                     SELECT 1 FROM ordertransactionfront otf3
+                     WHERE otf3.TableID = opf.TableID
+                       AND otf3.TransactionStatusID <> 7
+                 )
                 THEN 7
                 ELSE 0
             END AS TransactionStatusID
