@@ -1,5 +1,14 @@
 # Changelog — Staff Display
 
+## [3.14.0] — 2026-05-20
+
+### แก้ไขบัค (Modal แสดงเฉพาะออเดอร์ยกเลิก)
+- **[BUG-MODAL-VOID]** Modal แสดงเฉพาะออเดอร์ที่ยกเลิก ทั้งที่การ์ดหน้าหลักเห็น "กำลังทำ 2 / เสร็จแล้ว 8"
+  - **Root cause**: Timing race — `state.active` (poll-based, stale) และ `fetchTableOrders` (on-demand) เรียก DB ต่างเวลากัน ตอน state refresh ยังไม่มี session ใหม่ → orders ไม่ถูก flag `is_old_session` → การ์ดนับถูก ตอนกดเปิด modal → ordertransactionfront อัพเดทแล้ว → orders เก่าได้ `is_old_session=true` → ถูกกรองออก เหลือแต่ voided orders (voided มี `is_voided=true` ทำให้ `is_old_session` เป็น false เสมอ)
+  - **แก้ (`staff_display.php`)**: Modal ตรวจ `hasNewSession` ก่อน apply filter — ถ้าไม่มี non-voided order ที่ผ่าน `isHidden()` เลย แสดงว่าอาจเป็น false positive → fallback แสดงทุก non-combined order (ยกเว้น CombineBill จริงๆ เท่านั้น)
+
+---
+
 ## [3.13.0] — 2026-05-20
 
 ### แก้ไขบัค (Critical: is_combined ใช้ผิดความหมาย ทำให้ออเดอร์หายจากจอ)

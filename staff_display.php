@@ -687,7 +687,11 @@ function openModal(key, name){
         .then(r => r.json())
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');
-            const rows       = safeArray(json.rows).filter(r => !isHidden(r));
+            const allRows = safeArray(json.rows);
+            // ใช้ is_old_session filter เฉพาะเมื่อมี session ใหม่จริงๆ (มี non-voided order ที่ไม่ถูก hide)
+            // ถ้าไม่มี → แสดงทั้งหมด (ยกเว้น is_combined) เพื่อป้องกัน false positive ที่เกิดจาก timing
+            const hasNewSession = allRows.some(r => !r.is_combined && !r.is_old_session && !r.is_voided);
+            const rows       = allRows.filter(r => hasNewSession ? !isHidden(r) : !r.is_combined);
             const pids       = Array.isArray(json.allowed_printer_ids) ? json.allowed_printer_ids : [];
             const printerSet = pids.length > 0 ? new Set(pids.map(Number)) : null;
             const nDone   = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return s===PS_DONE||s===PS_RESOLVED||nonKds(r,printerSet); }).length;
