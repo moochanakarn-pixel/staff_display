@@ -468,6 +468,8 @@ function groupTables(active, finished){
         if(!r.is_voided && !r.is_combined && !isNonKds(r)){
             g.pending++;
             g.worst = Math.max(g.worst, waitMin(r));
+        } else if(!r.is_voided && !r.is_combined && isNonKds(r)){
+            g.done++;
         }
         if(r.SubmitOrderDateTime){
             const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
@@ -577,11 +579,11 @@ function buildRow(row, printerSet){
     const done     = st === PS_DONE || st === PS_RESOLVED || autoDone;
     const voided   = !autoDone && st === PS_VOIDED;
     const cls    = done ? 'r-done' : voided ? 'r-voided' : 'r-active';
-    const lbl    = done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
+    const lbl    = autoDone ? '✅ เสร็จแล้ว (ไม่ใช่จอนี้)' : done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
     const name = row.parent_name
         ? `${esc(row.parent_name)} · ${esc(row.ProductName||'-')}`
         : esc(row.ProductName||'-');
-    const time = done
+    const time = done && !autoDone
         ? `ส่ง ${esc(fmtTime(row.SubmitOrderDateTime))} · เสร็จ ${esc(fmtTime(row.FinishDateTime))}`
         : `ส่ง ${esc(fmtTime(row.SubmitOrderDateTime))}`;
     return `<div class="order-row ${cls}">
