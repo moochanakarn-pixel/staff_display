@@ -1,5 +1,15 @@
 # Changelog — Staff Display
 
+## [3.12.0] — 2026-05-20
+
+### แก้ไขบัค (Critical: ใช้ TransactionStatusID ผิดความหมาย)
+- **[BUG-STATUSID]** `TransactionStatusID = 7` ใน POS หมายถึง **CombineBill (รวมโต๊ะ)** ไม่ใช่ "จ่ายเงินแล้ว" — เราใช้ `<> 7` เป็นเงื่อนไขตรวจ "open transaction" ซึ่งผิดโดยสิ้นเชิง
+  - ตอนลูกค้าจ่ายเงิน → `TransactionStatusID = 2` (CloseBill)
+  - Transaction ที่ "ยังเปิดอยู่" = `TransactionStatusID = 1` (OpenBill)
+  - **แก้**: เปลี่ยน 3 จุดใน `api_checker.php` จาก `TransactionStatusID <> 7` เป็น `TransactionStatusID = 1` ทำให้ detect ได้ถูกต้องว่า transaction ใดยังเปิดอยู่ และ transaction ใดปิดแล้ว (จ่าย/รวม/void ทุกกรณี)
+
+---
+
 ## [3.11.0] — 2026-05-20
 
 ### แก้ไขบัค

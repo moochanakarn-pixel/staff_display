@@ -485,12 +485,12 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', 
                  AND NOT EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
                      WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID <> 7
+                       AND otf2.TransactionStatusID = 1
                  )
                  AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf3
                      WHERE otf3.TableID = opf.TableID
-                       AND otf3.TransactionStatusID <> 7
+                       AND otf3.TransactionStatusID = 1
                  )
                 THEN 7
                 ELSE 0
@@ -1129,12 +1129,12 @@ function fetchActiveRows($conn)
                  AND NOT EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
                      WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID <> 7
+                       AND otf2.TransactionStatusID = 1
                  )
                  AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf3
                      WHERE otf3.TableID = opf.TableID
-                       AND otf3.TransactionStatusID <> 7
+                       AND otf3.TransactionStatusID = 1
                  )
                 THEN 7
                 ELSE 0
@@ -1195,12 +1195,12 @@ function fetchFinishedRows($conn)
                  AND NOT EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
                      WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID <> 7
+                       AND otf2.TransactionStatusID = 1
                  )
                  AND EXISTS(
                      SELECT 1 FROM ordertransactionfront otf3
                      WHERE otf3.TableID = opf.TableID
-                       AND otf3.TransactionStatusID <> 7
+                       AND otf3.TransactionStatusID = 1
                  )
                 THEN 7
                 ELSE 0
