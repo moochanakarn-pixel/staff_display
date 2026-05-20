@@ -1,5 +1,14 @@
 # Changelog — Staff Display
 
+## [3.4.0] — 2026-05-20
+
+### แก้ไขบัค
+- **Modal เปิดออเดอร์ผิด transaction เมื่อโต๊ะมีลูกค้าใหม่** (`staff_display.php`)
+  - `getTransactionId` / `getOrderDate` ใช้ `.find()` คืน row แรกใน `state.active` (เรียง ASC) → ถ้า orders เก่า (is_combined=true) อยู่ก่อน modal จะโหลดข้อมูลลูกค้าเก่าแทน
+  - แก้: ให้ค้นหา row ที่ `!is_combined` ก่อนเสมอ เพื่อให้ modal แสดง transaction ปัจจุบัน (ลูกค้าใหม่) เสมอ
+
+---
+
 ## [3.3.0] — 2026-05-20
 
 ### แก้ไขบัค

@@ -564,12 +564,14 @@ function renderServeGrid(){
 
 /* ── Modal ── */
 function getTransactionId(key){
-    const row = safeArray(state.active).find(r => tKeyEff(r) === key)
+    const row = safeArray(state.active).find(r => tKeyEff(r) === key && !r.is_combined)
+             || safeArray(state.active).find(r => tKeyEff(r) === key)
              || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.TransactionID ? parseInt(row.TransactionID, 10) : 0;
 }
 function getOrderDate(key){
-    const row = safeArray(state.active).find(r => tKeyEff(r) === key)
+    const row = safeArray(state.active).find(r => tKeyEff(r) === key && !r.is_combined)
+             || safeArray(state.active).find(r => tKeyEff(r) === key)
              || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.OrderDate ? String(row.OrderDate).slice(0,10) : '';
 }
