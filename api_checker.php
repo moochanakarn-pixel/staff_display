@@ -492,15 +492,11 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', 
             END AS TransactionStatusID,
             CASE
                 WHEN opf.TransactionID > 0
-                 AND EXISTS(
-                     SELECT 1 FROM ordertransactionfront otf2
-                     WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID = 2
-                 )
-                 AND EXISTS(
-                     SELECT 1 FROM ordertransactionfront otf3
-                     WHERE otf3.TableID = opf.TableID
-                       AND otf3.TransactionStatusID = 1
+                 AND opf.TransactionID < (
+                     SELECT MAX(opf2.TransactionID)
+                     FROM orderprocessdetailfront opf2
+                     WHERE opf2.TableID = opf.TableID
+                       AND opf2.TransactionID > 0
                  )
                 THEN 1
                 ELSE 0
@@ -1146,15 +1142,11 @@ function fetchActiveRows($conn)
             END AS TransactionStatusID,
             CASE
                 WHEN opf.TransactionID > 0
-                 AND EXISTS(
-                     SELECT 1 FROM ordertransactionfront otf2
-                     WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID = 2
-                 )
-                 AND EXISTS(
-                     SELECT 1 FROM ordertransactionfront otf3
-                     WHERE otf3.TableID = opf.TableID
-                       AND otf3.TransactionStatusID = 1
+                 AND opf.TransactionID < (
+                     SELECT MAX(opf2.TransactionID)
+                     FROM orderprocessdetailfront opf2
+                     WHERE opf2.TableID = opf.TableID
+                       AND opf2.TransactionID > 0
                  )
                 THEN 1
                 ELSE 0
@@ -1222,15 +1214,11 @@ function fetchFinishedRows($conn)
             END AS TransactionStatusID,
             CASE
                 WHEN opf.TransactionID > 0
-                 AND EXISTS(
-                     SELECT 1 FROM ordertransactionfront otf2
-                     WHERE otf2.TransactionID = opf.TransactionID
-                       AND otf2.TransactionStatusID = 2
-                 )
-                 AND EXISTS(
-                     SELECT 1 FROM ordertransactionfront otf3
-                     WHERE otf3.TableID = opf.TableID
-                       AND otf3.TransactionStatusID = 1
+                 AND opf.TransactionID < (
+                     SELECT MAX(opf2.TransactionID)
+                     FROM orderprocessdetailfront opf2
+                     WHERE opf2.TableID = opf.TableID
+                       AND opf2.TransactionID > 0
                  )
                 THEN 1
                 ELSE 0

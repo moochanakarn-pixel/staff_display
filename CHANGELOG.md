@@ -1,5 +1,15 @@
 # Changelog — Staff Display
 
+## [3.16.0] — 2026-05-20
+
+### ปรับปรุง (IsOldSession ใช้ MAX TransactionID แทน ordertransactionfront)
+- **[IMPROVE-OLD-SESSION]** เปลี่ยน logic ตรวจ session เก่าจากการ join `ordertransactionfront` มาใช้ `MAX(TransactionID)` จาก `orderprocessdetailfront` ตรงๆ
+  - **เดิม**: `EXISTS(status=2 in ordertransactionfront)` → พึ่งพา `ordertransactionfront` ที่อาจ sparse หรือลบทิ้ง (ini76 pattern) ทำให้ false positive
+  - **ใหม่**: `opf.TransactionID < MAX(opf2.TransactionID) WHERE TableID = opf.TableID` — TransactionID รันเพิ่มต่อเนื่องต่อบิล ค่าสูงสุดคือ session ล่าสุด ออเดอร์ที่ TransactionID ต่ำกว่า = session เก่า → ซ่อน
+  - ไม่ต้องพึ่ง `ordertransactionfront` เลยสำหรับ old session detection → ไม่มี false positive จากข้อมูลขาด
+
+---
+
 ## [3.15.0] — 2026-05-20
 
 ### แก้ไข (IsOldSession ใช้ status ที่ถูกต้อง)
