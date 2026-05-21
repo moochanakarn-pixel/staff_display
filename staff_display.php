@@ -197,6 +197,7 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         .tc-badge.kitchen{color:var(--secondary)}
         .tc-badge.done{color:var(--success)}
         .tc-badge.empty{color:#9ca3af}
+        .tc-badge.combined{color:#7c3aed}
 
         /* Modal */
         .modal-overlay{
@@ -241,6 +242,10 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         .r-active .or-name{color:#0f2945}
         .r-voided .or-name{color:#9ca3af;text-decoration:line-through}
         .or-time{font-size:11px;color:var(--muted);margin-top:2px}
+        .or-elapsed{font-size:11px;font-weight:bold;margin-top:1px}
+        .or-elapsed.el-ok{color:var(--success)}
+        .or-elapsed.el-warn{color:#d97706}
+        .or-elapsed.el-late{color:#dc2626}
         .or-right{text-align:right;flex-shrink:0}
         .or-qty{font-size:18px;font-weight:bold}
         .r-done   .or-qty{color:var(--success)}
@@ -436,6 +441,24 @@ function waitMin(row){
     const d = new Date(String(row.SubmitOrderDateTime||'').replace(' ','T'));
     return isNaN(d) ? 0 : Math.max(0,Math.floor((Date.now()-d)/60000));
 }
+function cookMin(row){
+    const start = new Date(String(row.SubmitOrderDateTime||'').replace(' ','T'));
+    if(isNaN(start)) return -1;
+    const end = row.FinishDateTime
+        ? new Date(String(row.FinishDateTime).replace(' ','T'))
+        : new Date();
+    return Math.max(0, Math.floor((end - start) / 60000));
+}
+function elapsedBadge(row, done, voided){
+    if(voided) return '';
+    const m = cookMin(row);
+    if(m < 0) return '';
+    if(done){
+        return `<div class="or-elapsed el-ok">⏱ เสร็จใน ${m} นาที</div>`;
+    }
+    const cls = m >= T_RED ? 'el-late' : m >= T_YELLOW ? 'el-warn' : 'el-ok';
+    return `<div class="or-elapsed ${cls}">🕒 ${m} นาที</div>`;
+}
 function tKey(row){ return String(row.TableID || row.DisplayTableName || '-'); }
 // สำหรับ order ย้ายโต๊ะ: ถ้า TableID ว่าง ให้ใช้ moved_to (ปลายทาง) แทน DisplayTableName "2->4"
 function tKeyEff(row){
@@ -457,35 +480,53 @@ function byZone(rows){
 /* ── Group rows by table → card data ── */
 function groupTables(active, finished){
     const map = new Map();
+    const sessionStarts = new Map(); // key → earliest active non-voided SubmitOrderDateTime
     function get(key, name){
-        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null});
+        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null,currentTxId:0,hasCombined:false});
         return map.get(key);
     }
     safeArray(active).forEach(r => {
+        if(isHidden(r)) return;
         const key  = tKeyEff(r);
         const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
         const g    = get(key, name);
-        if(!r.is_voided && !r.is_combined && !isNonKds(r)){
+        if(r.is_combined) g.hasCombined = true;
+        if(!r.is_voided && !isNonKds(r)){
             g.pending++;
             g.worst = Math.max(g.worst, waitMin(r));
+        } else if(!r.is_voided && isNonKds(r)){
+            g.done++;
         }
-        if(r.SubmitOrderDateTime){
+        if(!r.is_voided && r.SubmitOrderDateTime){
             const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
-            if(!isNaN(t) && (g.openTime === null || t < g.openTime)) g.openTime = t;
+            if(!isNaN(t)){
+                if(g.openTime === null || t < g.openTime) g.openTime = t;
+                const cur = sessionStarts.get(key);
+                if(!cur || t < cur) sessionStarts.set(key, t);
+            }
         }
     });
     safeArray(finished).forEach(r => {
+        if(isHidden(r)) return;
         const key  = tKeyEff(r);
+        // skip finished rows that pre-date the current active session
+        if(sessionStarts.has(key) && r.SubmitOrderDateTime){
+            const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
+            if(!isNaN(t) && t < sessionStarts.get(key)) return;
+        }
         const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
-        get(key, name).done++;
+        const g    = get(key, name);
+        if(r.is_combined) g.hasCombined = true;
+        g.done++;
     });
     return Array.from(map.values());
 }
 
 /* ── Table Card ── */
 function cardCls(g){
-    if(g.isEmpty)          return 's-empty';
-    if(g.pending === 0)    return 's-done';
+    if(g.isEmpty)                        return 's-empty';
+    if(g.pending === 0 && g.done === 0)  return 's-empty';
+    if(g.pending === 0)                  return 's-done';
     if(g.worst >= T_RED)   return 's-red';
     if(g.worst >= T_YELLOW)return 's-yellow';
     return '';
@@ -499,6 +540,7 @@ function buildCard(g){
     const badges = [];
     if(g.pending > 0) badges.push(`<div class="tc-badge kitchen">🍳 ${g.pending} กำลังทำ</div>`);
     if(g.done    > 0) badges.push(`<div class="tc-badge done">✅ ${g.done} เสร็จแล้ว</div>`);
+    if(g.hasCombined)  badges.push(`<div class="tc-badge combined">🔗 รวมโต๊ะแล้ว</div>`);
     const openStr = g.openTime
         ? g.openTime.toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'})
         : '';
@@ -561,15 +603,30 @@ function renderServeGrid(){
 }
 
 /* ── Modal ── */
+function isHidden(r){ return r.is_old_session; }
 function getTransactionId(key){
-    const row = safeArray(state.active).find(r => tKeyEff(r) === key)
+    const row = safeArray(state.active).find(r => tKeyEff(r) === key && !isHidden(r))
+             || safeArray(state.finished).find(r => tKeyEff(r) === key && !isHidden(r))
              || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.TransactionID ? parseInt(row.TransactionID, 10) : 0;
 }
 function getOrderDate(key){
-    const row = safeArray(state.active).find(r => tKeyEff(r) === key)
+    const row = safeArray(state.active).find(r => tKeyEff(r) === key && !isHidden(r))
+             || safeArray(state.finished).find(r => tKeyEff(r) === key && !isHidden(r))
              || safeArray(state.finished).find(r => tKeyEff(r) === key);
     return row && row.OrderDate ? String(row.OrderDate).slice(0,10) : '';
+}
+// หาเวลาเริ่มออเดอร์แรกสุดของ session ปัจจุบัน (จาก non-hidden rows ใน state)
+function getSessionStart(key){
+    const rows = [
+        ...safeArray(state.active).filter(r => tKeyEff(r) === key && !isHidden(r)),
+        ...safeArray(state.finished).filter(r => tKeyEff(r) === key && !isHidden(r)),
+    ];
+    if(!rows.length) return '';
+    return rows.reduce((min, r) => {
+        const t = r.SubmitOrderDateTime || '';
+        return t && (!min || t < min) ? t : min;
+    }, '');
 }
 function buildRow(row, printerSet){
     const st       = parseInt(row.ProcessStatus, 10);
@@ -577,17 +634,18 @@ function buildRow(row, printerSet){
     const done     = st === PS_DONE || st === PS_RESOLVED || autoDone;
     const voided   = !autoDone && st === PS_VOIDED;
     const cls    = done ? 'r-done' : voided ? 'r-voided' : 'r-active';
-    const lbl    = done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
+    const lbl    = autoDone ? '✅ เสร็จแล้ว (ไม่ใช่จอนี้)' : done ? '✅ เสร็จแล้ว' : voided ? '🚫 ยกเลิก' : '🍳 กำลังทำ';
     const name = row.parent_name
         ? `${esc(row.parent_name)} · ${esc(row.ProductName||'-')}`
         : esc(row.ProductName||'-');
-    const time = done
+    const time = done && !autoDone
         ? `ส่ง ${esc(fmtTime(row.SubmitOrderDateTime))} · เสร็จ ${esc(fmtTime(row.FinishDateTime))}`
         : `ส่ง ${esc(fmtTime(row.SubmitOrderDateTime))}`;
     return `<div class="order-row ${cls}">
         <div>
             <div class="or-name">${name}</div>
             <div class="or-time">${time}</div>
+            ${elapsedBadge(row, done, voided)}
         </div>
         <div class="or-right">
             <div class="or-qty">x${fmtQty(row.ProductAmount)}</div>
@@ -661,11 +719,17 @@ function openModal(key, name){
     const txParam = txId > 0 ? '&transaction_id=' + txId : '';
     const od      = getOrderDate(key);
     const odParam = !txParam && od ? '&order_date=' + encodeURIComponent(od) : '';
-    fetch('api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + txParam + odParam + cidParam + '&_=' + Date.now(), {cache:'no-store', signal:msig})
+    const ss      = !txParam ? getSessionStart(key) : '';
+    const ssParam = ss ? '&session_start=' + encodeURIComponent(ss) : '';
+    fetch('api_checker.php?action=list_table_orders&table_id=' + encodeURIComponent(key) + txParam + odParam + ssParam + cidParam + '&_=' + Date.now(), {cache:'no-store', signal:msig})
         .then(r => r.json())
         .then(json => {
             if(!json.success) throw new Error(json.error||'error');
-            const rows       = safeArray(json.rows);
+            const allRows = safeArray(json.rows);
+            // ซ่อนเฉพาะ is_old_session (session เก่าหลังจ่ายเงิน)
+            // is_combined (รวมโต๊ะ) ยังแสดงปกติ ครัวต้องเห็นทุกรายการ
+            const hasNewSession = allRows.some(r => !r.is_old_session && !r.is_voided);
+            const rows       = allRows.filter(r => hasNewSession ? !r.is_old_session : true);
             const pids       = Array.isArray(json.allowed_printer_ids) ? json.allowed_printer_ids : [];
             const printerSet = pids.length > 0 ? new Set(pids.map(Number)) : null;
             const nDone   = rows.filter(r => { const s=parseInt(r.ProcessStatus,10); return s===PS_DONE||s===PS_RESOLVED||nonKds(r,printerSet); }).length;
@@ -746,7 +810,7 @@ async function loadAll(){
             const pids = Array.isArray(ar.allowed_printer_ids) ? ar.allowed_printer_ids : [];
             state.allowedPrinters = pids.length > 0 ? new Set(pids.map(Number)) : null;
             setDot('');
-            const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!r.is_combined&&!isNonKds(r)).length;
+            const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!isHidden(r)&&!isNonKds(r)).length;
             document.title = pending > 0 ? `(${pending}) Staff Display` : 'Staff Display';
         }
         renderGrid();
@@ -765,12 +829,12 @@ document.getElementById('tableGrid').addEventListener('click', e => {
 document.getElementById('modalClose').addEventListener('click', closeModal);
 document.getElementById('tableModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
 document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
-document.getElementById('refreshBtn').addEventListener('click', loadAll);
+document.getElementById('refreshBtn').addEventListener('click', () => { if(window._isAuthed) loadAll(); });
 document.getElementById('zoneInner').addEventListener('click', e => {
     const b = e.target.closest('.btn-zone');
     if(b) setZone(b.dataset.zid||'');
 });
-document.addEventListener('visibilitychange', () => { if(!document.hidden) loadAll(); });
+document.addEventListener('visibilitychange', () => { if(!document.hidden && window._isAuthed) loadAll(); });
 
 /* ── Fullscreen ── */
 (function(){
@@ -791,6 +855,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
 (function(){
     const LS_KEY = 'staff_display';
     let _pollTimer = null;
+    window._isAuthed = false;
 
     function startPolling(){
         stopPolling();
@@ -802,6 +867,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
         if(_pollTimer){ clearInterval(_pollTimer); _pollTimer = null; }
     }
     function setStaff(id, name){
+        window._isAuthed = true;
         document.getElementById('loginOverlay').classList.add('hidden');
         document.getElementById('logoutBtn').style.display = '';
         document.getElementById('logoutBtn').dataset.isGuest = id > 0 ? '0' : '1';
@@ -809,6 +875,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden) loadA
         startPolling();
     }
     function showLogin(){
+        window._isAuthed = false;
         stopPolling();
         document.getElementById('loginOverlay').classList.remove('hidden');
         document.getElementById('logoutBtn').style.display = 'none';
