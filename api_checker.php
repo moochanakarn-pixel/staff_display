@@ -474,14 +474,7 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', 
                 ELSE 0
             END AS TransactionStatusID,
             CASE
-                WHEN opf.TransactionID > 0
-                 AND opf.TransactionID < (
-                     SELECT MAX(opf2.TransactionID)
-                     FROM orderprocessdetailfront opf2
-                     WHERE opf2.TableID = opf.TableID
-                       AND opf2.TransactionID > 0
-                 )
-                THEN 1
+                WHEN opf.TransactionID > 0 THEN 1
                 ELSE 0
             END AS IsOldSession";
     $join = "LEFT JOIN salemode sm ON sm.SaleModeID = opf.SaleModeID AND sm.Deleted = 0";
@@ -1127,14 +1120,7 @@ function fetchActiveRows($conn)
                 ELSE 0
             END AS TransactionStatusID,
             CASE
-                WHEN opf.TransactionID > 0
-                 AND opf.TransactionID < (
-                     SELECT MAX(opf2.TransactionID)
-                     FROM orderprocessdetailfront opf2
-                     WHERE opf2.TableID = opf.TableID
-                       AND opf2.TransactionID > 0
-                 )
-                THEN 1
+                WHEN opf.TransactionID > 0 THEN 1
                 ELSE 0
             END AS IsOldSession
         FROM orderprocessdetailfront opf
@@ -1202,14 +1188,7 @@ function fetchFinishedRows($conn)
                 ELSE 0
             END AS TransactionStatusID,
             CASE
-                WHEN opf.TransactionID > 0
-                 AND opf.TransactionID < (
-                     SELECT MAX(opf2.TransactionID)
-                     FROM orderprocessdetailfront opf2
-                     WHERE opf2.TableID = opf.TableID
-                       AND opf2.TransactionID > 0
-                 )
-                THEN 1
+                WHEN opf.TransactionID > 0 THEN 1
                 ELSE 0
             END AS IsOldSession
         FROM orderprocessdetailfront opf

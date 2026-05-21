@@ -3,10 +3,11 @@
 ## [3.21.0] — 2026-05-21
 
 ### แก้ไข (ออเดอร์เสร็จแล้วของบิลก่อนหน้าสะสมทั้งวัน)
-- **[SESSION-FILTER]** `groupTables` เพิ่ม `sessionStarts` map — เก็บเวลา `SubmitOrderDateTime` เร็วที่สุดของ active orders ต่อโต๊ะ
-  - ระหว่างประมวล finished rows: ถ้าโต๊ะนั้นมี active session → กรองออก finished rows ที่ `SubmitOrderDateTime` ก่อนหน้า session ปัจจุบัน
-  - ถ้าโต๊ะไม่มี active orders → แสดง finished ทั้งหมด (ไม่มี session ใหม่ให้เปรียบเทียบ)
-  - แก้ปัญหา `TransactionID=0` ทำให้ `IsOldSession` SQL ไม่ทำงาน — ใช้เวลา client-side แทน ไม่ต้อง query เพิ่ม
+- **[SESSION-FILTER]** แก้ `IsOldSession` SQL ทั้ง 3 จุด (`fetchTableOrders`, `fetchActiveRows`, `fetchFinishedRows`)
+  - เดิม: ใช้ `MAX(TransactionID)` subquery — ไม่ทำงานเพราะ `orderprocessdetailfront` มี `TransactionID=0` ตลอดขณะโต๊ะยังเปิด
+  - ใหม่: `CASE WHEN opf.TransactionID > 0 THEN 1 ELSE 0 END` — ตรงจุดกว่า เพราะ `TransactionID=0` หมายถึงบิลยังเปิดอยู่ (session ปัจจุบัน), `TransactionID > 0` หมายถึงบิลปิดแล้ว (old session)
+  - ลบ subquery ที่ไม่จำเป็นออก — ประสิทธิภาพดีขึ้น
+- **[SESSION-FILTER]** `groupTables` JS: เพิ่ม `sessionStarts` map เป็น safety net — กรอง finished rows เก่ากว่า active session timestamp ออกฝั่ง client
 
 ---
 
