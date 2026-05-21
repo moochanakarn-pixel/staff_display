@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>คู่มือการใช้งาน — Staff Display</title>
+<style>
+:root{
+    --blue:#1683ff;--blue-dark:#0a3d80;--teal:#0d9488;
+    --green:#16a34a;--yellow:#d97706;--red:#dc2626;
+    --bg:#f0f6ff;--surface:#fff;--line:#e2e8f0;
+    --text:#0f2945;--muted:#64748b;
+    --radius:16px;--shadow:0 4px 20px rgba(8,40,100,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+
+/* ── Header ── */
+.hero{
+    background:linear-gradient(135deg,var(--blue-dark) 0%,var(--blue) 55%,#e8823a 100%);
+    color:#fff;padding:56px 24px 48px;text-align:center;
+}
+.hero-icon{width:72px;height:72px;border-radius:18px;margin:0 auto 20px;display:block}
+.hero h1{font-size:32px;font-weight:800;margin-bottom:8px}
+.hero p{font-size:16px;opacity:.85;max-width:480px;margin:0 auto}
+.version-badge{
+    display:inline-block;margin-top:16px;padding:4px 14px;border-radius:999px;
+    background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);
+    font-size:12px;font-weight:700;letter-spacing:.5px;
+}
+
+/* ── Layout ── */
+.container{max-width:860px;margin:0 auto;padding:40px 20px 80px}
+
+/* ── Section ── */
+.section{margin-bottom:48px}
+.section-header{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.section-icon{
+    width:44px;height:44px;border-radius:12px;display:flex;align-items:center;
+    justify-content:center;font-size:22px;flex-shrink:0;
+    background:linear-gradient(135deg,var(--blue-dark),var(--blue));color:#fff;
+}
+.section-title{font-size:22px;font-weight:800;color:var(--text)}
+.section-sub{font-size:13px;color:var(--muted);margin-top:2px}
+
+/* ── Card ── */
+.card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+.card-body{padding:20px 24px}
+
+/* ── Step list ── */
+.steps{list-style:none;display:flex;flex-direction:column;gap:16px}
+.step{display:flex;gap:16px;align-items:flex-start}
+.step-num{
+    width:32px;height:32px;border-radius:50%;flex-shrink:0;
+    background:linear-gradient(135deg,var(--blue-dark),var(--blue));color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:800;margin-top:2px;
+}
+.step-content{flex:1}
+.step-title{font-weight:700;font-size:15px;margin-bottom:3px}
+.step-desc{font-size:14px;color:var(--muted)}
+
+/* ── Color legend ── */
+.color-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.color-card{
+    border-radius:12px;padding:14px 16px;border:2px solid transparent;
+}
+.color-card.c-white{background:#fff;border-color:#e5e7eb}
+.color-card.c-yellow{background:linear-gradient(180deg,#fffde7,#fff);border-color:#ffe066;box-shadow:0 0 0 3px rgba(255,214,0,.15)}
+.color-card.c-red{background:linear-gradient(180deg,#fff2f0,#fff);border-color:#ffb3ab;box-shadow:0 0 0 3px rgba(228,76,58,.12)}
+.color-card.c-green{background:linear-gradient(180deg,#edfff5,#fff);border-color:#6edda0;box-shadow:0 0 0 3px rgba(18,161,80,.15)}
+.color-card.c-empty{background:#f9fafb;border-color:#e5e7eb;opacity:.7}
+.color-dot{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+.dot-white{background:#94a3b8}
+.dot-yellow{background:#f5a623}
+.dot-red{background:#e44c3a}
+.dot-green{background:#12a150}
+.dot-empty{background:#d1d5db}
+.color-label{font-size:13px;font-weight:700;margin-bottom:4px}
+.color-desc{font-size:12px;color:var(--muted)}
+
+/* ── Mock card ── */
+.mock-card{
+    background:#fff;border:2px solid #e5e7eb;border-radius:14px;
+    padding:12px 10px;text-align:center;display:inline-block;min-width:100px;
+}
+.mock-card .tc-name{font-size:20px;font-weight:800;color:#0f2945}
+.mock-card .tc-time{font-size:11px;color:#8fa3bc;font-weight:600;margin:2px 0}
+.mock-card .tc-badge{font-size:12px;font-weight:700;padding:2px 0}
+.mock-card .badge-kitchen{color:#f5a623}
+.mock-card .badge-done{color:#16a34a}
+
+/* ── Topbar mock ── */
+.topbar-mock{
+    background:linear-gradient(135deg,rgba(8,58,112,.92),rgba(22,131,255,.88),rgba(255,138,31,.84));
+    border-radius:12px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;
+    color:#fff;margin-bottom:12px;
+}
+.topbar-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px}
+.topbar-actions{display:flex;gap:8px;align-items:center}
+.mock-btn{
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.2);
+    border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:#fff;
+}
+.mock-dot{width:8px;height:8px;border-radius:50%;background:#4ade80}
+.mock-chip{
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.2);
+    border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;color:#fff;
+}
+
+/* ── Zone bar mock ── */
+.zonebar-mock{
+    background:#fff;border:1px solid var(--line);border-radius:10px;
+    padding:8px 12px;display:flex;gap:8px;margin-bottom:8px;
+}
+.zone-btn{
+    padding:4px 14px;border-radius:999px;font-size:12px;font-weight:700;
+    background:#f1f5f9;color:var(--muted);border:none;
+}
+.zone-btn.active{background:var(--blue);color:#fff}
+
+/* ── Modal mock ── */
+.modal-mock{
+    background:#fff;border-radius:16px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--line);
+}
+.modal-title{font-size:18px;font-weight:800;margin-bottom:6px}
+.modal-badges{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.mbadge{font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px}
+.mbadge.done{background:#dcfce7;color:#16a34a}
+.mbadge.cooking{background:#fff7ed;color:#d97706}
+.mbadge.void{background:#f1f5f9;color:#94a3b8}
+.modal-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9}
+.modal-row:last-child{border-bottom:none}
+.row-name{font-size:13px;font-weight:600}
+.row-sub{font-size:11px;color:var(--muted)}
+.row-status{font-size:12px;font-weight:700}
+.row-status.done{color:var(--green)}
+.row-status.cooking{color:var(--yellow)}
+
+/* ── Settings mock ── */
+.sp-row-mock{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9}
+.sp-row-mock:last-child{border-bottom:none}
+.sp-label{font-size:14px;font-weight:600}
+.sp-sub{font-size:12px;color:var(--muted)}
+.toggle-on{width:38px;height:22px;border-radius:999px;background:var(--blue);position:relative;flex-shrink:0}
+.toggle-on::after{content:'';position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff}
+.toggle-off{width:38px;height:22px;border-radius:999px;background:#cbd5e1;position:relative;flex-shrink:0}
+.toggle-off::after{content:'';position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff}
+
+/* ── Tip box ── */
+.tip{
+    background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;
+    padding:14px 16px;font-size:13px;color:#1e40af;display:flex;gap:10px;
+    align-items:flex-start;margin-top:12px;
+}
+.tip-icon{font-size:18px;flex-shrink:0;margin-top:-1px}
+
+/* ── Tag ── */
+.tag{
+    display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;
+    background:#eff6ff;color:var(--blue);border:1px solid #bfdbfe;margin:2px;
+}
+
+/* ── Table ── */
+.info-table{width:100%;border-collapse:collapse;font-size:14px}
+.info-table th{text-align:left;padding:10px 12px;background:#f8fafc;font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.info-table td{padding:10px 12px;border-top:1px solid var(--line)}
+.info-table tr:hover td{background:#fafbff}
+
+/* ── Nav ── */
+.toc{
+    background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:20px 24px;margin-bottom:40px;
+}
+.toc-title{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.toc-list{list-style:none;display:flex;flex-direction:column;gap:6px}
+.toc-list a{text-decoration:none;color:var(--blue);font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.toc-list a:hover{text-decoration:underline}
+
+/* ── Footer ── */
+.footer{text-align:center;padding:32px;color:var(--muted);font-size:13px}
+
+@media(max-width:600px){
+    .hero h1{font-size:24px}
+    .color-grid{grid-template-columns:1fr 1fr}
+    .container{padding:24px 16px 60px}
+}
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+    <img src="logo.svg" alt="Staff Display" class="hero-icon">
+    <h1>คู่มือการใช้งาน</h1>
+    <p>Staff Display — ระบบแสดงสถานะออเดอร์สำหรับพนักงานหลังร้าน</p>
+    <span class="version-badge">v2.8.0</span>
+</div>
+
+<div class="container">
+
+    <!-- TOC -->
+    <div class="toc">
+        <div class="toc-title">สารบัญ</div>
+        <ul class="toc-list">
+            <li><a href="#login">① การเข้าสู่ระบบ</a></li>
+            <li><a href="#topbar">② แถบด้านบน (Topbar)</a></li>
+            <li><a href="#grid">③ หน้าจอหลัก — การ์ดโต๊ะ</a></li>
+            <li><a href="#colors">④ ความหมายของสีการ์ด</a></li>
+            <li><a href="#modal">⑤ รายละเอียดโต๊ะ (Modal)</a></li>
+            <li><a href="#zones">⑥ การกรองตาม Zone</a></li>
+            <li><a href="#settings">⑦ หน้าตั้งค่า</a></li>
+        </ul>
+    </div>
+
+    <!-- ① Login -->
+    <div class="section" id="login">
+        <div class="section-header">
+            <div class="section-icon">🔐</div>
+            <div>
+                <div class="section-title">การเข้าสู่ระบบ</div>
+                <div class="section-sub">กรอกรหัสพนักงานเพื่อเริ่มใช้งาน</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <ul class="steps">
+                    <li class="step">
+                        <div class="step-num">1</div>
+                        <div class="step-content">
+                            <div class="step-title">กรอกรหัสพนักงาน</div>
+                            <div class="step-desc">พิมพ์ StaffCode ของคุณในช่องรหัสพนักงาน แล้วกด "เข้าสู่ระบบ" หรือกด Enter</div>
+                        </div>
+                    </li>
+                    <li class="step">
+                        <div class="step-num">2</div>
+                        <div class="step-content">
+                            <div class="step-title">ระบบจำข้อมูลไว้ให้</div>
+                            <div class="step-desc">เมื่อ login แล้ว ถ้าเปิดหน้าใหม่หรือ reload ระบบจะเข้าโดยอัตโนมัติโดยไม่ต้องกรอกใหม่</div>
+                        </div>
+                    </li>
+                    <li class="step">
+                        <div class="step-num">3</div>
+                        <div class="step-content">
+                            <div class="step-title">ออกจากระบบ</div>
+                            <div class="step-desc">กดที่ chip ชื่อของคุณมุมขวาบน เพื่อออกจากระบบ</div>
+                        </div>
+                    </li>
+                </ul>
+                <div class="tip">
+                    <span class="tip-icon">💡</span>
+                    <span>ถ้าผู้ดูแลตั้งค่าให้ไม่ต้องใส่รหัส ระบบจะข้ามหน้า login ไปเลย แต่ยังกด "เข้าสู่ระบบ" ใน topbar ได้ทุกเมื่อ</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ② Topbar -->
+    <div class="section" id="topbar">
+        <div class="section-header">
+            <div class="section-icon">🔝</div>
+            <div>
+                <div class="section-title">แถบด้านบน (Topbar)</div>
+                <div class="section-sub">ปุ่มและข้อมูลหลักของระบบ</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="topbar-mock">
+                    <div class="topbar-brand">
+                        <span style="font-size:20px">📋</span> Staff Display
+                    </div>
+                    <div class="topbar-actions">
+                        <div class="mock-dot"></div>
+                        <div class="mock-btn">🍽️ เสิร์ฟ</div>
+                        <div class="mock-btn">รีเฟรช</div>
+                        <div class="mock-chip">👤 Manager1</div>
+                    </div>
+                </div>
+                <table class="info-table">
+                    <tr><th>องค์ประกอบ</th><th>ความหมาย</th></tr>
+                    <tr><td><strong>จุดสถานะ</strong> (●)</td><td>🟢 ปกติ &nbsp;|&nbsp; 🟡 กำลังโหลด &nbsp;|&nbsp; 🔴 เชื่อมต่อไม่ได้</td></tr>
+                    <tr><td><strong>🍽️ เสิร์ฟ / 🍳 KDS</strong></td><td>สลับระหว่างหน้า KDS (ครัว) และ Serve Display (พนักงานเสิร์ฟ)</td></tr>
+                    <tr><td><strong>รีเฟรช</strong></td><td>โหลดข้อมูลใหม่ทันที ไม่ต้องรอ interval</td></tr>
+                    <tr><td><strong>⛶ เต็มจอ</strong></td><td>เปิด/ปิด Fullscreen mode</td></tr>
+                    <tr><td><strong>Chip ชื่อ</strong></td><td>กดเพื่อออกจากระบบ (หรือเข้าสู่ระบบ ถ้ายังไม่ได้ login)</td></tr>
+                </table>
+                <div class="tip">
+                    <span class="tip-icon">⚙️</span>
+                    <span>กด <strong>โลโก้ 3 ครั้งเร็ว ๆ</strong> ภายใน 1.5 วินาที เพื่อเปิดหน้าตั้งค่า</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ③ Grid -->
+    <div class="section" id="grid">
+        <div class="section-header">
+            <div class="section-icon">🗂️</div>
+            <div>
+                <div class="section-title">หน้าจอหลัก — การ์ดโต๊ะ</div>
+                <div class="section-sub">แต่ละการ์ดแสดงสถานะของโต๊ะนั้น</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;justify-content:center">
+                    <div class="mock-card" style="border-color:#ffe066;background:linear-gradient(180deg,#fffde7,#fff);box-shadow:0 0 0 3px rgba(255,214,0,.2)">
+                        <div class="tc-name">13</div>
+                        <div class="tc-time">⏱ 09:58</div>
+                        <div class="tc-badge badge-kitchen">🍳 7 กำลังทำ</div>
+                    </div>
+                    <div class="mock-card" style="border-color:#6edda0;background:linear-gradient(180deg,#edfff5,#fff);box-shadow:0 0 0 3px rgba(18,161,80,.18)">
+                        <div class="tc-name">20</div>
+                        <div class="tc-time">⏱ 10:03</div>
+                        <div class="tc-badge badge-done">✅ 6 เสร็จแล้ว</div>
+                    </div>
+                    <div class="mock-card" style="opacity:.6;cursor:default">
+                        <div class="tc-name" style="color:#9ca3af">ว่าง</div>
+                        <div class="tc-badge" style="color:#9ca3af">ว่าง</div>
+                    </div>
+                </div>
+                <table class="info-table">
+                    <tr><th>ส่วน</th><th>ความหมาย</th></tr>
+                    <tr><td><strong>ชื่อโต๊ะ (ตัวใหญ่)</strong></td><td>ชื่อโต๊ะตามที่ตั้งไว้ในระบบ POS</td></tr>
+                    <tr><td><strong>⏱ HH:MM</strong></td><td>เวลาที่ order แรกสุดของโต๊ะนี้เข้ามา</td></tr>
+                    <tr><td><strong>🍳 X กำลังทำ</strong></td><td>จำนวนรายการที่ยังทำอยู่ใน station นี้</td></tr>
+                    <tr><td><strong>✅ X เสร็จแล้ว</strong></td><td>จำนวนรายการที่ confirm แล้ว</td></tr>
+                    <tr><td><strong>ว่าง</strong></td><td>โต๊ะในโซนนี้ที่ยังไม่มีออเดอร์วันนี้</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ④ Colors -->
+    <div class="section" id="colors">
+        <div class="section-header">
+            <div class="section-icon">🎨</div>
+            <div>
+                <div class="section-title">ความหมายของสีการ์ด</div>
+                <div class="section-sub">สีบอกความเร่งด่วนของโต๊ะ</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="color-grid">
+                    <div class="color-card c-white">
+                        <div class="color-label"><span class="color-dot dot-white"></span>ปกติ (ขาว)</div>
+                        <div class="color-desc">มีออเดอร์เข้ามา ยังอยู่ในเวลาปกติ</div>
+                    </div>
+                    <div class="color-card c-yellow">
+                        <div class="color-label"><span class="color-dot dot-yellow"></span>เตือน (เหลือง)</div>
+                        <div class="color-desc">รอนานเกินเวลาเตือน (ค่า default 10 นาที)</div>
+                    </div>
+                    <div class="color-card c-red">
+                        <div class="color-label"><span class="color-dot dot-red"></span>เร่งด่วน (แดง)</div>
+                        <div class="color-desc">รอนานมาก เกินเวลาแดง (ค่า default 20 นาที)</div>
+                    </div>
+                    <div class="color-card c-green">
+                        <div class="color-label"><span class="color-dot dot-green"></span>เสร็จแล้ว (เขียว)</div>
+                        <div class="color-desc">ทุกรายการ confirm แล้ว รอเสิร์ฟ</div>
+                    </div>
+                    <div class="color-card c-empty">
+                        <div class="color-label"><span class="color-dot dot-empty"></span>ว่าง (เทา)</div>
+                        <div class="color-desc">ยังไม่มีออเดอร์เข้ามาวันนี้</div>
+                    </div>
+                </div>
+                <div class="tip">
+                    <span class="tip-icon">⏱️</span>
+                    <span>ปรับเวลาเตือนสีเหลือง/แดงได้ในหน้าตั้งค่า (กด logo 3 ครั้ง)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑤ Modal -->
+    <div class="section" id="modal">
+        <div class="section-header">
+            <div class="section-icon">📋</div>
+            <div>
+                <div class="section-title">รายละเอียดโต๊ะ (Modal)</div>
+                <div class="section-sub">กดการ์ดโต๊ะเพื่อดูรายการอาหารทั้งหมด</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="modal-mock" style="max-width:420px;margin:0 auto 20px">
+                    <div class="modal-title">โต๊ะ 13</div>
+                    <div class="modal-badges">
+                        <span class="mbadge done">✅ เสร็จ 0</span>
+                        <span class="mbadge cooking">🍳 กำลังทำ 7</span>
+                        <span class="mbadge void">❌ ยกเลิก 0</span>
+                    </div>
+                    <div class="modal-row">
+                        <div><div class="row-name">Premium 7 Rolls · Hon Maguro</div><div class="row-sub">ส่ง 09:56</div></div>
+                        <div class="row-status cooking">🍳 กำลังทำ</div>
+                    </div>
+                    <div class="modal-row">
+                        <div><div class="row-name">Premium 7 Rolls · Unagi Hand Roll</div><div class="row-sub">ส่ง 09:56 · เสร็จ 10:02</div></div>
+                        <div class="row-status done">✅ เสร็จแล้ว</div>
+                    </div>
+                </div>
+                <table class="info-table">
+                    <tr><th>สถานะรายการ</th><th>ความหมาย</th></tr>
+                    <tr><td><span style="color:#d97706;font-weight:700">🍳 กำลังทำ</span></td><td>รายการนี้ยังอยู่ระหว่างทำ</td></tr>
+                    <tr><td><span style="color:#16a34a;font-weight:700">✅ เสร็จแล้ว</span></td><td>ทำเสร็จและ confirm แล้ว</td></tr>
+                    <tr><td><span style="color:#94a3b8;font-weight:700">❌ ยกเลิก</span></td><td>รายการถูก void จาก POS</td></tr>
+                    <tr><td><span style="color:#94a3b8;font-weight:700">— (เทา)</span></td><td>รายการของ station อื่น (ไม่ใช่งานของหน้าจอนี้)</td></tr>
+                </table>
+                <div class="tip">
+                    <span class="tip-icon">👆</span>
+                    <span>กดนอกกรอบ หรือกด <strong>✕</strong> หรือกด <strong>Escape</strong> เพื่อปิด modal</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑥ Zones -->
+    <div class="section" id="zones">
+        <div class="section-header">
+            <div class="section-icon">🗺️</div>
+            <div>
+                <div class="section-title">การกรองตาม Zone</div>
+                <div class="section-sub">แสดงเฉพาะโต๊ะในโซนที่ต้องการ</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+                <div class="zonebar-mock">
+                    <button class="zone-btn active">ทั้งหมด</button>
+                    <button class="zone-btn">Zone-1</button>
+                    <button class="zone-btn">Zone-2</button>
+                    <button class="zone-btn">Zone-3</button>
+                    <button class="zone-btn">Zone-4</button>
+                </div>
+                <ul class="steps" style="margin-top:12px">
+                    <li class="step">
+                        <div class="step-num">1</div>
+                        <div class="step-content">
+                            <div class="step-title">เลือก Zone ที่ต้องการ</div>
+                            <div class="step-desc">กดปุ่ม Zone ด้านบนเพื่อกรองโต๊ะ — แสดงเฉพาะโต๊ะในโซนนั้น พร้อมโต๊ะว่างของโซนด้วย</div>
+                        </div>
+                    </li>
+                    <li class="step">
+                        <div class="step-num">2</div>
+                        <div class="step-content">
+                            <div class="step-title">กด "ทั้งหมด" เพื่อดูทุกโซน</div>
+                            <div class="step-desc">กลับมาแสดงทุกโต๊ะที่มีออเดอร์ทั้งหมด (ไม่มีโต๊ะว่าง)</div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑦ Settings -->
+    <div class="section" id="settings">
+        <div class="section-header">
+            <div class="section-icon">⚙️</div>
+            <div>
+                <div class="section-title">หน้าตั้งค่า</div>
+                <div class="section-sub">กด logo 3 ครั้งเร็ว ๆ ภายใน 1.5 วินาที เพื่อเปิด</div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-body">
+
+                <p style="font-size:13px;color:var(--muted);margin-bottom:16px">การตั้งค่าแบ่งเป็น 4 หมวด:</p>
+
+                <!-- เวลา -->
+                <div style="background:#f8fafc;border-radius:12px;padding:14px 16px;margin-bottom:12px">
+                    <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⏱️ เวลา & รีเฟรช</div>
+                    <div class="sp-row-mock">
+                        <div><div class="sp-label">เตือนสีเหลือง</div><div class="sp-sub">นาทีที่จะเปลี่ยนการ์ดเป็นสีเหลือง</div></div>
+                        <span class="tag">10 นาที</span>
+                    </div>
+                    <div class="sp-row-mock">
+                        <div><div class="sp-label">เตือนสีแดง</div><div class="sp-sub">นาทีที่จะเปลี่ยนการ์ดเป็นสีแดง</div></div>
+                        <span class="tag">20 นาที</span>
+                    </div>
+                    <div class="sp-row-mock">
+                        <div><div class="sp-label">รีเฟรชอัตโนมัติ</div><div class="sp-sub">ความถี่การโหลดข้อมูลใหม่</div></div>
+                        <span class="tag">15s</span><span class="tag">30s</span><span class="tag">60s</span>
+                    </div>
+                </div>
+
+                <!-- การแจ้งเตือน -->
+                <div style="background:#f8fafc;border-radius:12px;padding:14px 16px;margin-bottom:12px">
+                    <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🔔 การแจ้งเตือน</div>
+                    <div class="sp-row-mock">
+                        <div><div class="sp-label">เสียงแจ้งเตือน</div><div class="sp-sub">เปิด/ปิดเสียงเมื่อมี order ใหม่</div></div>
+                        <div class="toggle-off"></div>
+                    </div>
+                </div>
+
+                <!-- จอแสดงผล -->
+                <div style="background:#f8fafc;border-radius:12px;padding:14px 16px;margin-bottom:12px">
+                    <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🖥️ จอแสดงผล</div>
+                    <div class="sp-row-mock">
+                        <div><div class="sp-label">ชื่อจอ</div><div class="sp-sub">ชื่อเรียกหน้าจอนี้</div></div>
+                        <span class="tag">ชื่อที่ตั้ง</span>
+                    </div>
+                    <div class="sp-row-mock">
+                        <div><div class="sp-label">DB Host / Database</div><div class="sp-sub">ที่อยู่และชื่อฐานข้อมูล</div></div>
+                        <span class="tag">server config</span>
+                    </div>
+                    <div class="sp-row-mock">
+                        <div><div class="sp-label">Computer ID</div><div class="sp-sub">ID ของหน้าจอนี้ใน POS</div></div>
+                        <span class="tag">ID</span>
+                    </div>
+                </div>
+
+                <!-- การเข้าใช้งาน -->
+                <div style="background:#f8fafc;border-radius:12px;padding:14px 16px;margin-bottom:12px">
+                    <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🔐 การเข้าใช้งาน</div>
+                    <div class="sp-row-mock">
+                        <div><div class="sp-label">บังคับใส่รหัสพนักงาน</div><div class="sp-sub">ปิด = เข้าใช้งานได้เลยไม่ต้อง login</div></div>
+                        <div class="toggle-on"></div>
+                    </div>
+                </div>
+
+                <!-- Serve Mode -->
+                <div style="background:#f8fafc;border-radius:12px;padding:14px 16px">
+                    <div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🍽️ Serve Mode</div>
+                    <div class="sp-row-mock">
+                        <div><div class="sp-label">แสดงเฉพาะโต๊ะพร้อมเสิร์ฟ</div><div class="sp-sub">ซ่อนโต๊ะที่ยังมีรายการทำอยู่</div></div>
+                        <div class="toggle-off"></div>
+                    </div>
+                    <div class="sp-row-mock">
+                        <div><div class="sp-label">ซ่อนปุ่มสลับหน้าเสิร์ฟ</div><div class="sp-sub">ไม่แสดงปุ่มใน topbar</div></div>
+                        <div class="toggle-off"></div>
+                    </div>
+                </div>
+
+                <div class="tip" style="margin-top:16px">
+                    <span class="tip-icon">🔒</span>
+                    <span>ค่า port, username และ password ของฐานข้อมูลซ่อนไว้ ไม่แสดงในหน้าตั้งค่าเพื่อความปลอดภัย</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="footer">
+    Staff Display v2.8.0 &nbsp;·&nbsp; คู่มือการใช้งาน
+</div>
+
+</body>
+</html>
