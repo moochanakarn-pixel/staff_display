@@ -480,6 +480,7 @@ function byZone(rows){
 /* ── Group rows by table → card data ── */
 function groupTables(active, finished){
     const map = new Map();
+    const sessionStarts = new Map(); // key → earliest active non-voided SubmitOrderDateTime
     function get(key, name){
         if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null,currentTxId:0,hasCombined:false});
         return map.get(key);
@@ -496,14 +497,23 @@ function groupTables(active, finished){
         } else if(!r.is_voided && isNonKds(r)){
             g.done++;
         }
-        if(r.SubmitOrderDateTime){
+        if(!r.is_voided && r.SubmitOrderDateTime){
             const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
-            if(!isNaN(t) && (g.openTime === null || t < g.openTime)) g.openTime = t;
+            if(!isNaN(t)){
+                if(g.openTime === null || t < g.openTime) g.openTime = t;
+                const cur = sessionStarts.get(key);
+                if(!cur || t < cur) sessionStarts.set(key, t);
+            }
         }
     });
     safeArray(finished).forEach(r => {
         if(isHidden(r)) return;
         const key  = tKeyEff(r);
+        // skip finished rows that pre-date the current active session
+        if(sessionStarts.has(key) && r.SubmitOrderDateTime){
+            const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
+            if(!isNaN(t) && t < sessionStarts.get(key)) return;
+        }
         const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
         const g    = get(key, name);
         if(r.is_combined) g.hasCombined = true;

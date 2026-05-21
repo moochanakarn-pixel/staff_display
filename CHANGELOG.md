@@ -1,5 +1,15 @@
 # Changelog — Staff Display
 
+## [3.21.0] — 2026-05-21
+
+### แก้ไข (ออเดอร์เสร็จแล้วของบิลก่อนหน้าสะสมทั้งวัน)
+- **[SESSION-FILTER]** `groupTables` เพิ่ม `sessionStarts` map — เก็บเวลา `SubmitOrderDateTime` เร็วที่สุดของ active orders ต่อโต๊ะ
+  - ระหว่างประมวล finished rows: ถ้าโต๊ะนั้นมี active session → กรองออก finished rows ที่ `SubmitOrderDateTime` ก่อนหน้า session ปัจจุบัน
+  - ถ้าโต๊ะไม่มี active orders → แสดง finished ทั้งหมด (ไม่มี session ใหม่ให้เปรียบเทียบ)
+  - แก้ปัญหา `TransactionID=0` ทำให้ `IsOldSession` SQL ไม่ทำงาน — ใช้เวลา client-side แทน ไม่ต้อง query เพิ่ม
+
+---
+
 ## [3.20.0] — 2026-05-20
 
 ### ฟีเจอร์ใหม่ (แสดงเวลาทำอาหารต่อรายการในจอ modal)
