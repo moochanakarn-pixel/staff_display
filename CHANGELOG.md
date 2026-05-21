@@ -1,5 +1,15 @@
 # Changelog — Staff Display
 
+## [3.22.0] — 2026-05-21
+
+### ลบ dead code ออก
+- **[CLEANUP]** ลบไฟล์ที่ไม่ได้ใช้: `staff_display2.php`, `guide.html`
+- **[CLEANUP]** ลบ 22 functions ใน `api_checker.php` ที่ unreachable เพราะ blocklist (write operations) — api_checker.php เหลือ 1,678 บรรทัด จาก 2,589 บรรทัด (-911 บรรทัด)
+  - Blocked handlers: `handleTestSystemSettingsConnection`, `handleSaveSystemSettings`, `confirmOne`, `checkoutOne`, `checkoutBarcode`, `undoOne`, `resolveStatus`, `setProductOutOfStock`
+  - Orphaned helpers (cascade): `normalizeSystemSettingsPayload`, `validateSystemSettingsPayload`, `writeSystemSettingsFile`, `parseCheckoutBarcode`, `fetchLockedProcessRowByBarcode`, `resolveProcessRow`, `sendCheckoutPrintToPrintServer`, `enqueueCheckoutPrintJob`, `decorateCheckoutPrintRow`, `buildCheckoutPrintServerPayload`, `fetchLockedProcessRow`, `fetchLockedChildRows`, `fetchLockedFinishedChildRowsForUndo`, `calculateChildCheckoutQty`, `applyCheckoutSplit`, `undoFinishedProcessRow`, `findNextSubProcessId`, `findAvailablePrinterById`, `resolvePrintJobTable`, `tableExists`, `findNextCheckoutPrintNo`, `fetchSaleModeName`, `buildCheckoutPrintHeader`, `buildCheckoutPrintComment`, `calculateProcessMinutes`
+
+---
+
 ## [3.21.0] — 2026-05-21
 
 ### แก้ไข (ออเดอร์เสร็จแล้วของบิลก่อนหน้าสะสมทั้งวัน)
