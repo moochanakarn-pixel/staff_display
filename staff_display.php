@@ -341,9 +341,52 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         .sp-msg{font-size:13px;text-align:center;padding:4px 0;min-height:20px}
         .sp-msg.ok{color:var(--success)}
         .sp-msg.err{color:var(--danger)}
+
+        /* ── Install banner ── */
+        .install-banner{
+            position:fixed;bottom:0;left:0;right:0;z-index:190;
+            background:#fff;
+            border-top:2px solid var(--line);
+            box-shadow:0 -4px 24px rgba(15,23,42,.13);
+            padding:14px 18px 18px;
+            display:flex;align-items:flex-start;gap:14px;
+            transform:translateY(100%);
+            transition:transform .3s cubic-bezier(.4,0,.2,1);
+        }
+        .install-banner.show{transform:translateY(0)}
+        .install-banner-icon{font-size:32px;line-height:1;flex-shrink:0;margin-top:2px}
+        .install-banner-body{flex:1;min-width:0}
+        .install-banner-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
+        .install-banner-sub{font-size:13px;color:var(--muted);line-height:1.5}
+        .install-banner-sub ol{margin:6px 0 0 16px;padding:0}
+        .install-banner-sub li{margin-bottom:2px}
+        .install-banner-actions{display:flex;gap:8px;margin-top:10px}
+        .install-btn{
+            height:36px;padding:0 16px;border-radius:10px;border:none;cursor:pointer;
+            font-size:13px;font-weight:700;
+            background:linear-gradient(135deg,#1260cc,#1683ff);color:#fff;
+        }
+        .install-dismiss{
+            height:36px;padding:0 14px;border-radius:10px;cursor:pointer;
+            font-size:13px;font-weight:600;color:var(--muted);
+            background:none;border:1.5px solid var(--line);
+        }
     </style>
 </head>
 <body<?php echo $_isServe ? ' class="serve-mode"' : ''; ?>>
+
+<!-- Install banner -->
+<div id="installBanner" class="install-banner">
+    <div class="install-banner-icon">📲</div>
+    <div class="install-banner-body">
+        <div class="install-banner-title" id="installBannerTitle">ติดตั้งแอปบนมือถือ</div>
+        <div class="install-banner-sub" id="installBannerSub">เพิ่มทางลัดไว้บนหน้าจอหลัก เปิดได้เลยโดยไม่ต้องเปิดเบราว์เซอร์</div>
+        <div class="install-banner-actions">
+            <button class="install-btn" id="installBtn">ติดตั้ง</button>
+            <button class="install-dismiss" id="installDismiss">ไม่ใช่ตอนนี้</button>
+        </div>
+    </div>
+</div>
 
 <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
@@ -1132,6 +1175,82 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden && win
             if(_taps.length >= 3){ _taps=[]; openSettings(); }
             else { _tapTimer = setTimeout(()=>{ _taps=[]; }, 1500); }
         });
+    }
+})();
+
+/* ── PWA Install banner ── */
+(function(){
+    const DISMISS_KEY = 'kds_install_dismissed';
+    const banner   = document.getElementById('installBanner');
+    const btnInst  = document.getElementById('installBtn');
+    const btnDism  = document.getElementById('installDismiss');
+    const title    = document.getElementById('installBannerTitle');
+    const sub      = document.getElementById('installBannerSub');
+
+    if(!banner) return;
+
+    // ถ้าติดตั้งเป็นแอปแล้ว หรือกด dismiss ไปแล้ว → ไม่แสดง
+    const alreadyInstalled = window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+    const dismissed = lsGet(DISMISS_KEY, false);
+    if(alreadyInstalled || dismissed) return;
+
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+        && !/crios|fxios/i.test(navigator.userAgent);
+
+    let deferredPrompt = null;
+
+    function showBanner(){
+        setTimeout(() => banner.classList.add('show'), 800);
+    }
+
+    function hideBanner(){
+        banner.classList.remove('show');
+    }
+
+    btnDism.addEventListener('click', () => {
+        hideBanner();
+        lsSet(DISMISS_KEY, true);
+    });
+
+    if(isIOS){
+        // iOS Safari — แสดง instruction ขั้นตอน
+        title.textContent = 'เพิ่มทางลัดบน iPhone/iPad';
+        sub.innerHTML = '<ol><li>แตะปุ่ม <strong>Share</strong> (📤) ในแถบเบราว์เซอร์</li><li>เลือก <strong>"Add to Home Screen"</strong></li><li>กด <strong>Add</strong></li></ol>';
+        btnInst.textContent = 'ดูวิธีทำ ▾';
+        btnInst.addEventListener('click', () => {
+            // toggle แสดง/ซ่อน instruction (instruction แสดงใน sub อยู่แล้ว)
+            hideBanner();
+            lsSet(DISMISS_KEY, true);
+        });
+        showBanner();
+    } else {
+        // Android/Chrome — รอ beforeinstallprompt
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            deferredPrompt = e;
+            showBanner();
+        });
+
+        btnInst.addEventListener('click', async () => {
+            if(!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            hideBanner();
+            if(outcome === 'accepted') lsSet(DISMISS_KEY, true);
+        });
+
+        // ถ้าติดตั้งสำเร็จผ่านช่องทางอื่น
+        window.addEventListener('appinstalled', () => {
+            hideBanner();
+            lsSet(DISMISS_KEY, true);
+        });
+    }
+
+    // register service worker
+    if('serviceWorker' in navigator){
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
 })();
 
