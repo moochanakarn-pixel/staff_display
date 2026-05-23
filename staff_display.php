@@ -177,6 +177,15 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         /* Table grid */
         .page{max-width:1200px;margin:0 auto;padding:14px 12px 28px}
         .table-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+        .sm-header{
+            grid-column:1/-1;
+            display:flex;align-items:center;gap:8px;
+            font-size:13px;font-weight:700;color:var(--muted);
+            padding:6px 4px 2px;
+            border-bottom:1.5px solid var(--line);
+            margin-bottom:2px;
+            letter-spacing:.3px;text-transform:uppercase;
+        }
         .table-card{
             background:#fff;border:2px solid var(--line);border-radius:18px;
             padding:14px 10px 12px;text-align:center;cursor:pointer;
@@ -524,15 +533,17 @@ function byZone(rows){
 function groupTables(active, finished){
     const map = new Map();
     const sessionStarts = new Map(); // key → earliest active non-voided SubmitOrderDateTime
-    function get(key, name){
-        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null,currentTxId:0,hasCombined:false});
+    function get(key, name, smId, smName){
+        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null,currentTxId:0,hasCombined:false,saleModeId:smId||0,saleModeName:smName||''});
         return map.get(key);
     }
     safeArray(active).forEach(r => {
         if(isHidden(r)) return;
-        const key  = tKeyEff(r);
-        const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
-        const g    = get(key, name);
+        const key    = tKeyEff(r);
+        const name   = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
+        const smId   = r.SaleModeID   ? parseInt(r.SaleModeID,10)  : 0;
+        const smName = r.SaleModeName ? String(r.SaleModeName)      : '';
+        const g      = get(key, name, smId, smName);
         if(r.is_combined) g.hasCombined = true;
         if(!r.is_voided && !isNonKds(r)){
             g.pending++;
@@ -615,7 +626,37 @@ function renderGrid(){
         wrap.innerHTML = '<div class="modal-msg" style="grid-column:1/-1">ไม่มีโต๊ะที่มีออเดอร์</div>';
         return;
     }
-    wrap.innerHTML = groups.map(buildCard).join('');
+
+    // แยก group ตาม SaleMode
+    const modeMap = new Map();
+    groups.forEach(g => {
+        const mk = g.saleModeId || 0;
+        if(!modeMap.has(mk)) modeMap.set(mk, {id:mk, name:g.saleModeName, cards:[]});
+        modeMap.get(mk).cards.push(g);
+    });
+
+    const multiMode = modeMap.size > 1;
+
+    function smIcon(id, name){
+        const n = (name||'').toLowerCase();
+        if(n.includes('grab'))     return '🟢';
+        if(n.includes('delivery')) return '🚚';
+        if(n.includes('takeaway') || n.includes('take away') || n.includes('take-away')) return '🛍️';
+        if(n.includes('lineman') || n.includes('line man')) return '🟡';
+        if(n.includes('foodpanda') || n.includes('panda')) return '🐼';
+        if(n.includes('dine') || n.includes('ทานที่'))    return '🍽️';
+        return '📦';
+    }
+
+    let html = '';
+    modeMap.forEach(mode => {
+        if(multiMode){
+            const label = mode.name && mode.name !== '-' ? mode.name : (mode.id ? 'Mode '+mode.id : 'Dine-in');
+            html += `<div class="sm-header">${smIcon(mode.id, mode.name)} ${esc(label)}</div>`;
+        }
+        html += mode.cards.map(buildCard).join('');
+    });
+    wrap.innerHTML = html;
 }
 
 function renderServeGrid(){
