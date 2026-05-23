@@ -1015,7 +1015,11 @@ function fetchActiveRows($conn)
         LEFT JOIN salemode sm
             ON sm.SaleModeID = opf.SaleModeID
            AND sm.Deleted = 0
-        LEFT JOIN orderdetailfront odf
+        LEFT JOIN (
+            SELECT ComputerID, OrderDetailID, MAX(TransactionID) AS TransactionID
+            FROM orderdetailfront
+            GROUP BY ComputerID, OrderDetailID
+        ) odf
             ON odf.ComputerID    = opf.ComputerID
            AND odf.OrderDetailID = opf.OrderDetailID
         LEFT JOIN ordertransactionfront otf
@@ -1090,7 +1094,11 @@ function fetchFinishedRows($conn)
         LEFT JOIN salemode sm
             ON sm.SaleModeID = opf.SaleModeID
            AND sm.Deleted = 0
-        LEFT JOIN orderdetailfront odf
+        LEFT JOIN (
+            SELECT ComputerID, OrderDetailID, MAX(TransactionID) AS TransactionID
+            FROM orderdetailfront
+            GROUP BY ComputerID, OrderDetailID
+        ) odf
             ON odf.ComputerID    = opf.ComputerID
            AND odf.OrderDetailID = opf.OrderDetailID
         LEFT JOIN ordertransactionfront otf

@@ -512,14 +512,16 @@ function elapsedBadge(row, done, voided){
     return `<div class="or-elapsed ${cls}">🕒 ${m} นาที</div>`;
 }
 function tKey(row){
-    const dn = row.DisplayTableName ? String(row.DisplayTableName).trim() : '';
-    if(dn) return dn;
+    // TableID ชนะก่อนเสมอ (รวมถึง moved order ที่ TableID = ปลายทาง)
     const tid = parseInt(row.TableID, 10) || 0;
     if(tid > 0) return String(tid);
-    // ใช้ OtfTransactionID (unique ต่อ bill จาก ordertransactionfront) เพื่อแยกแต่ละ bill ออกจากกัน
+    // ไม่มี TableID → delivery/TW: ใช้ DisplayTableName ถ้ามี (เช่น 'LM111', 'GF05')
+    const dn = row.DisplayTableName ? String(row.DisplayTableName).trim() : '';
+    if(dn) return dn;
+    // ใช้ OtfTransactionID (unique ต่อ bill) เพื่อแยกแต่ละ bill ออกจากกัน
     const otfId = parseInt(row.OtfTransactionID, 10) || 0;
     if(otfId > 0) return 'otf' + otfId;
-    // fallback: ถ้าไม่มี OtfTransactionID ให้แยกด้วย SaleModeID อย่างน้อย
+    // fallback: แยกด้วย SaleModeID อย่างน้อย
     return 'sm' + (parseInt(row.SaleModeID, 10) || 0) + '_t0';
 }
 // สำหรับ order ย้ายโต๊ะ: ถ้า TableID ว่าง ให้ใช้ moved_to (ปลายทาง) แทน DisplayTableName "2->4"
@@ -551,7 +553,7 @@ function groupTables(active, finished){
         if(isHidden(r)) return;
         const key    = tKeyEff(r);
         const name   = r.is_moved && r.moved_to ? String(r.moved_to)
-                     : (r.DisplayTableName || (parseInt(r.TableID,10) > 0 ? String(r.TableID) : (r.QueueName || '-')));
+                     : (r.DisplayTableName || (parseInt(r.TableID,10) > 0 ? String(r.TableID) : (r.QueueName || (parseInt(r.OtfTransactionID,10) > 0 ? '#'+parseInt(r.OtfTransactionID,10) : '-'))));
         const smId   = r.SaleModeID   ? parseInt(r.SaleModeID,10)  : 0;
         const smName = r.SaleModeName ? String(r.SaleModeName)      : '';
         const g      = get(key, name, smId, smName);
@@ -580,7 +582,7 @@ function groupTables(active, finished){
             if(!isNaN(t) && t < sessionStarts.get(key)) return;
         }
         const name   = r.is_moved && r.moved_to ? String(r.moved_to)
-                     : (r.DisplayTableName || (parseInt(r.TableID,10) > 0 ? String(r.TableID) : (r.QueueName || '-')));
+                     : (r.DisplayTableName || (parseInt(r.TableID,10) > 0 ? String(r.TableID) : (r.QueueName || (parseInt(r.OtfTransactionID,10) > 0 ? '#'+parseInt(r.OtfTransactionID,10) : '-'))));
         const smId   = r.SaleModeID   ? parseInt(r.SaleModeID,10) : 0;
         const smName = r.SaleModeName ? String(r.SaleModeName)    : '';
         const g      = get(key, name, smId, smName);
@@ -661,11 +663,11 @@ function renderGrid(){
     function smIcon(id, name){
         const n = (name||'').toLowerCase();
         if(n.includes('grab'))     return '🟢';
-        if(n.includes('delivery')) return '🚚';
-        if(n.includes('takeaway') || n.includes('take away') || n.includes('take-away')) return '🛍️';
-        if(n.includes('lineman') || n.includes('line man')) return '🟡';
-        if(n.includes('foodpanda') || n.includes('panda')) return '🐼';
-        if(n.includes('dine') || n.includes('ทานที่'))    return '🍽️';
+        if(n.includes('delivery') || n.includes('เดลิเวอรี')) return '🚚';
+        if(n.includes('takeaway') || n.includes('take away') || n.includes('take-away') || n.includes('รับกลับ') || n.includes('กลับบ้าน')) return '🛍️';
+        if(n.includes('lineman') || n.includes('line man') || n.includes('ไลน์แมน') || n.includes('ไลน์ แมน')) return '🟡';
+        if(n.includes('foodpanda') || n.includes('panda') || n.includes('แพนด้า') || n.includes('ฟู้ดแพนด้า')) return '🐼';
+        if(n.includes('dine') || n.includes('ทานที่') || n.includes('นั่งทาน') || n.includes('eat in') || n.includes('eatery')) return '🍽️';
         return '📦';
     }
 
