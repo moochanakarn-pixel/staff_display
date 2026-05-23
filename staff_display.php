@@ -516,7 +516,10 @@ function tKey(row){
     if(dn) return dn;
     const tid = parseInt(row.TableID, 10) || 0;
     if(tid > 0) return String(tid);
-    // delivery order ไม่มีชื่อโต๊ะ → ใช้ SaleModeID คั่นเพื่อไม่ให้ต่าง mode ไปอยู่ card เดียวกัน
+    // ใช้ OtfTransactionID (unique ต่อ bill จาก ordertransactionfront) เพื่อแยกแต่ละ bill ออกจากกัน
+    const otfId = parseInt(row.OtfTransactionID, 10) || 0;
+    if(otfId > 0) return 'otf' + otfId;
+    // fallback: ถ้าไม่มี OtfTransactionID ให้แยกด้วย SaleModeID อย่างน้อย
     return 'sm' + (parseInt(row.SaleModeID, 10) || 0) + '_t0';
 }
 // สำหรับ order ย้ายโต๊ะ: ถ้า TableID ว่าง ให้ใช้ moved_to (ปลายทาง) แทน DisplayTableName "2->4"
@@ -547,7 +550,8 @@ function groupTables(active, finished){
     safeArray(active).forEach(r => {
         if(isHidden(r)) return;
         const key    = tKeyEff(r);
-        const name   = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
+        const name   = r.is_moved && r.moved_to ? String(r.moved_to)
+                     : (r.DisplayTableName || (parseInt(r.TableID,10) > 0 ? String(r.TableID) : (r.QueueName || '-')));
         const smId   = r.SaleModeID   ? parseInt(r.SaleModeID,10)  : 0;
         const smName = r.SaleModeName ? String(r.SaleModeName)      : '';
         const g      = get(key, name, smId, smName);
@@ -575,7 +579,8 @@ function groupTables(active, finished){
             const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
             if(!isNaN(t) && t < sessionStarts.get(key)) return;
         }
-        const name   = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
+        const name   = r.is_moved && r.moved_to ? String(r.moved_to)
+                     : (r.DisplayTableName || (parseInt(r.TableID,10) > 0 ? String(r.TableID) : (r.QueueName || '-')));
         const smId   = r.SaleModeID   ? parseInt(r.SaleModeID,10) : 0;
         const smName = r.SaleModeName ? String(r.SaleModeName)    : '';
         const g      = get(key, name, smId, smName);

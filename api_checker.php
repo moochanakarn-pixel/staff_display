@@ -358,25 +358,35 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', 
     // ตรวจประเภทของ table_id เพื่อเลือก WHERE ที่ถูกต้อง
     // "12"        → numeric TableID  → WHERE opf.TableID = 12
     // "sm6_t0"    → synthetic key    → WHERE opf.TableID = 0 AND opf.SaleModeID = 6
+    // "otf123"    → OTF TransactionID → WHERE odf.TransactionID = 123 (JOIN orderdetailfront)
     // "LM111"     → DisplayTableName → WHERE opf.DisplayTableName = 'LM111'
     $tableIdInt  = is_numeric($tableId) ? (int)$tableId : -1;
     $saleModeId  = 0;
+    $otfTxId     = 0;
     $displayName = '';
     if ($tableIdInt > 0) {
-        $tableWhere = 'opf.TableID = ?';
-        $tableType  = 'i';
+        $tableWhere   = 'opf.TableID = ?';
+        $tableType    = 'i';
+        $bindTableVal = $tableIdInt;
     } elseif (preg_match('/^sm(\d+)_t0$/', $tableId, $m)) {
-        $saleModeId = (int)$m[1];
-        $tableWhere = 'opf.TableID = 0 AND opf.SaleModeID = ?';
-        $tableType  = 'i';
+        $saleModeId   = (int)$m[1];
+        $tableWhere   = 'opf.TableID = 0 AND opf.SaleModeID = ?';
+        $tableType    = 'i';
+        $bindTableVal = $saleModeId;
+    } elseif (preg_match('/^otf(\d+)$/', $tableId, $m)) {
+        $otfTxId      = (int)$m[1];
+        $tableWhere   = 'odf.TransactionID = ?';
+        $tableType    = 'i';
+        $bindTableVal = $otfTxId;
+        $join .= "\nINNER JOIN orderdetailfront odf"
+               . "\n    ON odf.ComputerID = opf.ComputerID"
+               . "\n   AND odf.OrderDetailID = opf.OrderDetailID";
     } else {
-        $displayName = $tableId;
-        $tableWhere  = 'opf.DisplayTableName = ?';
-        $tableType   = 's';
+        $displayName  = $tableId;
+        $tableWhere   = 'opf.DisplayTableName = ?';
+        $tableType    = 's';
+        $bindTableVal = $displayName;
     }
-
-    // bind helper: แทน $tableId ด้วยค่าที่ถูกต้องตาม type
-    $bindTableVal = ($tableIdInt > 0) ? $tableIdInt : ($saleModeId > 0 ? $saleModeId : $displayName);
 
     if ($transactionId > 0) {
         $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE $tableWhere AND opf.TransactionID = ? $order";
@@ -982,6 +992,8 @@ function fetchActiveRows($conn)
             opf.IsMoveOrder,
             opf.SaleModeID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
+            COALESCE(odf.TransactionID, 0) AS OtfTransactionID,
+            COALESCE(otf.QueueName, '') AS QueueName,
             CASE
                 WHEN EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
@@ -1003,6 +1015,11 @@ function fetchActiveRows($conn)
         LEFT JOIN salemode sm
             ON sm.SaleModeID = opf.SaleModeID
            AND sm.Deleted = 0
+        LEFT JOIN orderdetailfront odf
+            ON odf.ComputerID    = opf.ComputerID
+           AND odf.OrderDetailID = opf.OrderDetailID
+        LEFT JOIN ordertransactionfront otf
+            ON otf.TransactionID = odf.TransactionID
         WHERE " . implode(' AND ', $where) . "
         ORDER BY
             opf.SubmitOrderDateTime ASC,
@@ -1050,6 +1067,8 @@ function fetchFinishedRows($conn)
             opf.SaleModeID,
             opf.FinishStaffID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
+            COALESCE(odf.TransactionID, 0) AS OtfTransactionID,
+            COALESCE(otf.QueueName, '') AS QueueName,
             CASE
                 WHEN EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
@@ -1071,6 +1090,11 @@ function fetchFinishedRows($conn)
         LEFT JOIN salemode sm
             ON sm.SaleModeID = opf.SaleModeID
            AND sm.Deleted = 0
+        LEFT JOIN orderdetailfront odf
+            ON odf.ComputerID    = opf.ComputerID
+           AND odf.OrderDetailID = opf.OrderDetailID
+        LEFT JOIN ordertransactionfront otf
+            ON otf.TransactionID = odf.TransactionID
         WHERE " . implode(' AND ', $where) . "
         ORDER BY
             opf.FinishDateTime DESC,
