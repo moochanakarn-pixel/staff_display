@@ -511,7 +511,14 @@ function elapsedBadge(row, done, voided){
     const cls = m >= T_RED ? 'el-late' : m >= T_YELLOW ? 'el-warn' : 'el-ok';
     return `<div class="or-elapsed ${cls}">🕒 ${m} นาที</div>`;
 }
-function tKey(row){ return String(row.TableID || row.DisplayTableName || '-'); }
+function tKey(row){
+    const dn = row.DisplayTableName ? String(row.DisplayTableName).trim() : '';
+    if(dn) return dn;
+    const tid = parseInt(row.TableID, 10) || 0;
+    if(tid > 0) return String(tid);
+    // delivery order ไม่มีชื่อโต๊ะ → ใช้ SaleModeID คั่นเพื่อไม่ให้ต่าง mode ไปอยู่ card เดียวกัน
+    return 'sm' + (parseInt(row.SaleModeID, 10) || 0) + '_t0';
+}
 // สำหรับ order ย้ายโต๊ะ: ถ้า TableID ว่าง ให้ใช้ moved_to (ปลายทาง) แทน DisplayTableName "2->4"
 function tKeyEff(row){
     if(!row.TableID && row.is_moved && row.moved_to) return String(row.moved_to);
