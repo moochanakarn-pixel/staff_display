@@ -562,14 +562,16 @@ function groupTables(active, finished){
     });
     safeArray(finished).forEach(r => {
         if(isHidden(r)) return;
-        const key  = tKeyEff(r);
+        const key    = tKeyEff(r);
         // skip finished rows that pre-date the current active session
         if(sessionStarts.has(key) && r.SubmitOrderDateTime){
             const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
             if(!isNaN(t) && t < sessionStarts.get(key)) return;
         }
-        const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
-        const g    = get(key, name);
+        const name   = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
+        const smId   = r.SaleModeID   ? parseInt(r.SaleModeID,10) : 0;
+        const smName = r.SaleModeName ? String(r.SaleModeName)    : '';
+        const g      = get(key, name, smId, smName);
         if(r.is_combined) g.hasCombined = true;
         g.done++;
     });
@@ -612,8 +614,12 @@ function renderGrid(){
     const seen   = new Set(groups.map(g => g.key));
 
     if(state.zoneTables){
+        // หา SaleMode ของ dine-in จาก groups ที่มีอยู่แล้วใน zone นี้
+        const zoneGroup = groups.find(g => !g.isEmpty && state.zoneTables.has(g.key));
+        const emptySmId   = zoneGroup ? zoneGroup.saleModeId   : 0;
+        const emptySmName = zoneGroup ? zoneGroup.saleModeName : '';
         state.zoneTables.forEach((tname, tid) => {
-            if(!seen.has(tid)) groups.push({key:tid,name:tname,pending:0,done:0,worst:0,isEmpty:true});
+            if(!seen.has(tid)) groups.push({key:tid,name:tname,pending:0,done:0,worst:0,isEmpty:true,saleModeId:emptySmId,saleModeName:emptySmName});
         });
     }
 
@@ -637,6 +643,9 @@ function renderGrid(){
 
     const multiMode = modeMap.size > 1;
 
+    // เรียง section: SaleModeID น้อย→มาก (dine-in ID ต่ำมักอยู่ก่อน delivery)
+    const sortedModes = Array.from(modeMap.values()).sort((a,b) => a.id - b.id);
+
     function smIcon(id, name){
         const n = (name||'').toLowerCase();
         if(n.includes('grab'))     return '🟢';
@@ -649,7 +658,7 @@ function renderGrid(){
     }
 
     let html = '';
-    modeMap.forEach(mode => {
+    sortedModes.forEach(mode => {
         if(multiMode){
             const label = mode.name && mode.name !== '-' ? mode.name : (mode.id ? 'Mode '+mode.id : 'Dine-in');
             html += `<div class="sm-header">${smIcon(mode.id, mode.name)} ${esc(label)}</div>`;
