@@ -177,6 +177,15 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         /* Table grid */
         .page{max-width:1200px;margin:0 auto;padding:14px 12px 28px}
         .table-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+        .sm-header{
+            grid-column:1/-1;
+            display:flex;align-items:center;gap:8px;
+            font-size:13px;font-weight:700;color:var(--muted);
+            padding:6px 4px 2px;
+            border-bottom:1.5px solid var(--line);
+            margin-bottom:2px;
+            letter-spacing:.3px;text-transform:uppercase;
+        }
         .table-card{
             background:#fff;border:2px solid var(--line);border-radius:18px;
             padding:14px 10px 12px;text-align:center;cursor:pointer;
@@ -341,9 +350,52 @@ writeUsageLog($_isServe ? 'SERVE_PAGE_LOAD' : 'PAGE_LOAD', ['cid' => $_pageCid])
         .sp-msg{font-size:13px;text-align:center;padding:4px 0;min-height:20px}
         .sp-msg.ok{color:var(--success)}
         .sp-msg.err{color:var(--danger)}
+
+        /* ── Install banner ── */
+        .install-banner{
+            position:fixed;bottom:0;left:0;right:0;z-index:190;
+            background:#fff;
+            border-top:2px solid var(--line);
+            box-shadow:0 -4px 24px rgba(15,23,42,.13);
+            padding:14px 18px 18px;
+            display:flex;align-items:flex-start;gap:14px;
+            transform:translateY(100%);
+            transition:transform .3s cubic-bezier(.4,0,.2,1);
+        }
+        .install-banner.show{transform:translateY(0)}
+        .install-banner-icon{font-size:32px;line-height:1;flex-shrink:0;margin-top:2px}
+        .install-banner-body{flex:1;min-width:0}
+        .install-banner-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
+        .install-banner-sub{font-size:13px;color:var(--muted);line-height:1.5}
+        .install-banner-sub ol{margin:6px 0 0 16px;padding:0}
+        .install-banner-sub li{margin-bottom:2px}
+        .install-banner-actions{display:flex;gap:8px;margin-top:10px}
+        .install-btn{
+            height:36px;padding:0 16px;border-radius:10px;border:none;cursor:pointer;
+            font-size:13px;font-weight:700;
+            background:linear-gradient(135deg,#1260cc,#1683ff);color:#fff;
+        }
+        .install-dismiss{
+            height:36px;padding:0 14px;border-radius:10px;cursor:pointer;
+            font-size:13px;font-weight:600;color:var(--muted);
+            background:none;border:1.5px solid var(--line);
+        }
     </style>
 </head>
 <body<?php echo $_isServe ? ' class="serve-mode"' : ''; ?>>
+
+<!-- Install banner -->
+<div id="installBanner" class="install-banner">
+    <div class="install-banner-icon">📲</div>
+    <div class="install-banner-body">
+        <div class="install-banner-title" id="installBannerTitle">ติดตั้งแอปบนมือถือ</div>
+        <div class="install-banner-sub" id="installBannerSub">เพิ่มทางลัดไว้บนหน้าจอหลัก เปิดได้เลยโดยไม่ต้องเปิดเบราว์เซอร์</div>
+        <div class="install-banner-actions">
+            <button class="install-btn" id="installBtn">ติดตั้ง</button>
+            <button class="install-dismiss" id="installDismiss">ไม่ใช่ตอนนี้</button>
+        </div>
+    </div>
+</div>
 
 <div id="loginOverlay" class="login-overlay">
     <div class="login-card">
@@ -481,15 +533,17 @@ function byZone(rows){
 function groupTables(active, finished){
     const map = new Map();
     const sessionStarts = new Map(); // key → earliest active non-voided SubmitOrderDateTime
-    function get(key, name){
-        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null,currentTxId:0,hasCombined:false});
+    function get(key, name, smId, smName){
+        if(!map.has(key)) map.set(key,{key,name,pending:0,done:0,worst:0,openTime:null,currentTxId:0,hasCombined:false,saleModeId:smId||0,saleModeName:smName||''});
         return map.get(key);
     }
     safeArray(active).forEach(r => {
         if(isHidden(r)) return;
-        const key  = tKeyEff(r);
-        const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
-        const g    = get(key, name);
+        const key    = tKeyEff(r);
+        const name   = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
+        const smId   = r.SaleModeID   ? parseInt(r.SaleModeID,10)  : 0;
+        const smName = r.SaleModeName ? String(r.SaleModeName)      : '';
+        const g      = get(key, name, smId, smName);
         if(r.is_combined) g.hasCombined = true;
         if(!r.is_voided && !isNonKds(r)){
             g.pending++;
@@ -508,14 +562,16 @@ function groupTables(active, finished){
     });
     safeArray(finished).forEach(r => {
         if(isHidden(r)) return;
-        const key  = tKeyEff(r);
+        const key    = tKeyEff(r);
         // skip finished rows that pre-date the current active session
         if(sessionStarts.has(key) && r.SubmitOrderDateTime){
             const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
             if(!isNaN(t) && t < sessionStarts.get(key)) return;
         }
-        const name = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
-        const g    = get(key, name);
+        const name   = r.is_moved && r.moved_to ? String(r.moved_to) : (r.DisplayTableName || r.TableID || '-');
+        const smId   = r.SaleModeID   ? parseInt(r.SaleModeID,10) : 0;
+        const smName = r.SaleModeName ? String(r.SaleModeName)    : '';
+        const g      = get(key, name, smId, smName);
         if(r.is_combined) g.hasCombined = true;
         g.done++;
     });
@@ -558,8 +614,12 @@ function renderGrid(){
     const seen   = new Set(groups.map(g => g.key));
 
     if(state.zoneTables){
+        // หา SaleMode ของ dine-in จาก groups ที่มีอยู่แล้วใน zone นี้
+        const zoneGroup = groups.find(g => !g.isEmpty && state.zoneTables.has(g.key));
+        const emptySmId   = zoneGroup ? zoneGroup.saleModeId   : 0;
+        const emptySmName = zoneGroup ? zoneGroup.saleModeName : '';
         state.zoneTables.forEach((tname, tid) => {
-            if(!seen.has(tid)) groups.push({key:tid,name:tname,pending:0,done:0,worst:0,isEmpty:true});
+            if(!seen.has(tid)) groups.push({key:tid,name:tname,pending:0,done:0,worst:0,isEmpty:true,saleModeId:emptySmId,saleModeName:emptySmName});
         });
     }
 
@@ -572,7 +632,40 @@ function renderGrid(){
         wrap.innerHTML = '<div class="modal-msg" style="grid-column:1/-1">ไม่มีโต๊ะที่มีออเดอร์</div>';
         return;
     }
-    wrap.innerHTML = groups.map(buildCard).join('');
+
+    // แยก group ตาม SaleMode
+    const modeMap = new Map();
+    groups.forEach(g => {
+        const mk = g.saleModeId || 0;
+        if(!modeMap.has(mk)) modeMap.set(mk, {id:mk, name:g.saleModeName, cards:[]});
+        modeMap.get(mk).cards.push(g);
+    });
+
+    const multiMode = modeMap.size > 1;
+
+    // เรียง section: SaleModeID น้อย→มาก (dine-in ID ต่ำมักอยู่ก่อน delivery)
+    const sortedModes = Array.from(modeMap.values()).sort((a,b) => a.id - b.id);
+
+    function smIcon(id, name){
+        const n = (name||'').toLowerCase();
+        if(n.includes('grab'))     return '🟢';
+        if(n.includes('delivery')) return '🚚';
+        if(n.includes('takeaway') || n.includes('take away') || n.includes('take-away')) return '🛍️';
+        if(n.includes('lineman') || n.includes('line man')) return '🟡';
+        if(n.includes('foodpanda') || n.includes('panda')) return '🐼';
+        if(n.includes('dine') || n.includes('ทานที่'))    return '🍽️';
+        return '📦';
+    }
+
+    let html = '';
+    sortedModes.forEach(mode => {
+        if(multiMode){
+            const label = mode.name && mode.name !== '-' ? mode.name : (mode.id ? 'Mode '+mode.id : 'Dine-in');
+            html += `<div class="sm-header">${smIcon(mode.id, mode.name)} ${esc(label)}</div>`;
+        }
+        html += mode.cards.map(buildCard).join('');
+    });
+    wrap.innerHTML = html;
 }
 
 function renderServeGrid(){
@@ -1132,6 +1225,82 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden && win
             if(_taps.length >= 3){ _taps=[]; openSettings(); }
             else { _tapTimer = setTimeout(()=>{ _taps=[]; }, 1500); }
         });
+    }
+})();
+
+/* ── PWA Install banner ── */
+(function(){
+    const DISMISS_KEY = 'kds_install_dismissed';
+    const banner   = document.getElementById('installBanner');
+    const btnInst  = document.getElementById('installBtn');
+    const btnDism  = document.getElementById('installDismiss');
+    const title    = document.getElementById('installBannerTitle');
+    const sub      = document.getElementById('installBannerSub');
+
+    if(!banner) return;
+
+    // ถ้าติดตั้งเป็นแอปแล้ว หรือกด dismiss ไปแล้ว → ไม่แสดง
+    const alreadyInstalled = window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+    const dismissed = lsGet(DISMISS_KEY, false);
+    if(alreadyInstalled || dismissed) return;
+
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+        && !/crios|fxios/i.test(navigator.userAgent);
+
+    let deferredPrompt = null;
+
+    function showBanner(){
+        setTimeout(() => banner.classList.add('show'), 800);
+    }
+
+    function hideBanner(){
+        banner.classList.remove('show');
+    }
+
+    btnDism.addEventListener('click', () => {
+        hideBanner();
+        lsSet(DISMISS_KEY, true);
+    });
+
+    if(isIOS){
+        // iOS Safari — แสดง instruction ขั้นตอน
+        title.textContent = 'เพิ่มทางลัดบน iPhone/iPad';
+        sub.innerHTML = '<ol><li>แตะปุ่ม <strong>Share</strong> (📤) ในแถบเบราว์เซอร์</li><li>เลือก <strong>"Add to Home Screen"</strong></li><li>กด <strong>Add</strong></li></ol>';
+        btnInst.textContent = 'ดูวิธีทำ ▾';
+        btnInst.addEventListener('click', () => {
+            // toggle แสดง/ซ่อน instruction (instruction แสดงใน sub อยู่แล้ว)
+            hideBanner();
+            lsSet(DISMISS_KEY, true);
+        });
+        showBanner();
+    } else {
+        // Android/Chrome — รอ beforeinstallprompt
+        window.addEventListener('beforeinstallprompt', e => {
+            e.preventDefault();
+            deferredPrompt = e;
+            showBanner();
+        });
+
+        btnInst.addEventListener('click', async () => {
+            if(!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            hideBanner();
+            if(outcome === 'accepted') lsSet(DISMISS_KEY, true);
+        });
+
+        // ถ้าติดตั้งสำเร็จผ่านช่องทางอื่น
+        window.addEventListener('appinstalled', () => {
+            hideBanner();
+            lsSet(DISMISS_KEY, true);
+        });
+    }
+
+    // register service worker
+    if('serviceWorker' in navigator){
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
 })();
 
