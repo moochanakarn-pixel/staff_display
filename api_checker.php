@@ -355,28 +355,51 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', 
         $sessionFilter = ' AND opf.SubmitOrderDateTime >= ?';
     }
 
+    // ตรวจประเภทของ table_id เพื่อเลือก WHERE ที่ถูกต้อง
+    // "12"        → numeric TableID  → WHERE opf.TableID = 12
+    // "sm6_t0"    → synthetic key    → WHERE opf.TableID = 0 AND opf.SaleModeID = 6
+    // "LM111"     → DisplayTableName → WHERE opf.DisplayTableName = 'LM111'
+    $tableIdInt  = is_numeric($tableId) ? (int)$tableId : -1;
+    $saleModeId  = 0;
+    $displayName = '';
+    if ($tableIdInt > 0) {
+        $tableWhere = 'opf.TableID = ?';
+        $tableType  = 'i';
+    } elseif (preg_match('/^sm(\d+)_t0$/', $tableId, $m)) {
+        $saleModeId = (int)$m[1];
+        $tableWhere = 'opf.TableID = 0 AND opf.SaleModeID = ?';
+        $tableType  = 'i';
+    } else {
+        $displayName = $tableId;
+        $tableWhere  = 'opf.DisplayTableName = ?';
+        $tableType   = 's';
+    }
+
+    // bind helper: แทน $tableId ด้วยค่าที่ถูกต้องตาม type
+    $bindTableVal = ($tableIdInt > 0) ? $tableIdInt : ($saleModeId > 0 ? $saleModeId : $displayName);
+
     if ($transactionId > 0) {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.TransactionID = ? $order";
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE $tableWhere AND opf.TransactionID = ? $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
-        $stmt->bind_param('si', $tableId, $transactionId);
+        $stmt->bind_param($tableType . 'i', $bindTableVal, $transactionId);
     } elseif ($orderDate !== '') {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = ?$sessionFilter $order";
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE $tableWhere AND opf.OrderDate = ?$sessionFilter $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
         if ($sessionFilter !== '') {
-            $stmt->bind_param('sss', $tableId, $orderDate, $sessionStart);
+            $stmt->bind_param($tableType . 'ss', $bindTableVal, $orderDate, $sessionStart);
         } else {
-            $stmt->bind_param('ss', $tableId, $orderDate);
+            $stmt->bind_param($tableType . 's', $bindTableVal, $orderDate);
         }
     } else {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = CURDATE()$sessionFilter $order";
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE $tableWhere AND opf.OrderDate = CURDATE()$sessionFilter $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
         if ($sessionFilter !== '') {
-            $stmt->bind_param('ss', $tableId, $sessionStart);
+            $stmt->bind_param($tableType . 's', $bindTableVal, $sessionStart);
         } else {
-            $stmt->bind_param('s', $tableId);
+            $stmt->bind_param($tableType, $bindTableVal);
         }
     }
 
