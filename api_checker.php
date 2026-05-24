@@ -378,7 +378,7 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', 
         $tableWhere   = 'odf.TransactionID = ?';
         $tableType    = 'i';
         $bindTableVal = $otfTxId;
-        $join .= "\nINNER JOIN orderdetailfront odf"
+        $join .= "\nINNER JOIN (SELECT ComputerID, OrderDetailID, MAX(TransactionID) AS TransactionID FROM orderdetailfront GROUP BY ComputerID, OrderDetailID) odf"
                . "\n    ON odf.ComputerID = opf.ComputerID"
                . "\n   AND odf.OrderDetailID = opf.OrderDetailID";
     } else {
@@ -1226,11 +1226,14 @@ function mergeChildProcessRowsIntoParents($rows)
             $newCard['OrderNo']             = $parentRow['OrderNo'];
             $newCard['SaleModeID']          = $parentRow['SaleModeID'];
             $newCard['SaleModeName']        = isset($parentRow['SaleModeName']) ? $parentRow['SaleModeName'] : '-';
+            $newCard['OtfTransactionID']    = isset($parentRow['OtfTransactionID']) ? $parentRow['OtfTransactionID'] : 0;
+            $newCard['QueueName']           = isset($parentRow['QueueName']) ? $parentRow['QueueName'] : '';
             $newCard['SubmitOrderDateTime'] = $parentRow['SubmitOrderDateTime'];
             // inherit flags พิเศษจาก parent
-            if (!empty($parentRow['is_voided']))   $newCard['is_voided']   = true;
-            if (!empty($parentRow['is_moved']))    { $newCard['is_moved']  = true;  $newCard['moved_to'] = $parentRow['moved_to']; }
-            if (!empty($parentRow['is_combined'])) $newCard['is_combined'] = true;
+            if (!empty($parentRow['is_voided']))      $newCard['is_voided']      = true;
+            if (!empty($parentRow['is_moved']))        { $newCard['is_moved']     = true; $newCard['moved_to'] = $parentRow['moved_to']; }
+            if (!empty($parentRow['is_combined']))     $newCard['is_combined']    = true;
+            if (!empty($parentRow['is_old_session']))  $newCard['is_old_session'] = true;
 
             $insertsByParent[$parentIndex][] = $newCard;
             $hiddenParents[$parentIndex]     = true;
