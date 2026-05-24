@@ -481,7 +481,7 @@ function safeArray(v){ return Array.isArray(v) ? v : []; }
 function esc(s){ return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[m]); }
 function fmtTime(v){
     if(!v) return '-';
-    const d = new Date(String(v).replace(' ','T'));
+    const d = parseServerTime(v);
     return isNaN(d) ? esc(String(v).slice(11,16)||String(v))
         : d.toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
 }
@@ -489,16 +489,20 @@ function fmtQty(v){
     const n = Number(v||0);
     return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.00$/,'');
 }
+function parseServerTime(v){
+    // MySQL datetime 'YYYY-MM-DD HH:MM:SS' — ระบุ +07:00 ป้องกัน Safari/Chrome เก่า parse เป็น UTC
+    const s = String(v||'').trim().replace(' ','T');
+    if(!s) return new Date(NaN);
+    return new Date(s.includes('+') || s.includes('Z') ? s : s + '+07:00');
+}
 function waitMin(row){
-    const d = new Date(String(row.SubmitOrderDateTime||'').replace(' ','T'));
+    const d = parseServerTime(row.SubmitOrderDateTime);
     return isNaN(d) ? 0 : Math.max(0,Math.floor((Date.now()-d)/60000));
 }
 function cookMin(row){
-    const start = new Date(String(row.SubmitOrderDateTime||'').replace(' ','T'));
+    const start = parseServerTime(row.SubmitOrderDateTime);
     if(isNaN(start)) return -1;
-    const end = row.FinishDateTime
-        ? new Date(String(row.FinishDateTime).replace(' ','T'))
-        : new Date();
+    const end = row.FinishDateTime ? parseServerTime(row.FinishDateTime) : new Date();
     return Math.max(0, Math.floor((end - start) / 60000));
 }
 function elapsedBadge(row, done, voided){
@@ -565,7 +569,7 @@ function groupTables(active, finished){
             g.done++;
         }
         if(!r.is_voided && r.SubmitOrderDateTime){
-            const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
+            const t = parseServerTime(r.SubmitOrderDateTime);
             if(!isNaN(t)){
                 if(g.openTime === null || t < g.openTime) g.openTime = t;
                 const cur = sessionStarts.get(key);
@@ -578,7 +582,7 @@ function groupTables(active, finished){
         const key    = tKeyEff(r);
         // skip finished rows that pre-date the current active session
         if(sessionStarts.has(key) && r.SubmitOrderDateTime){
-            const t = new Date(String(r.SubmitOrderDateTime).replace(' ','T'));
+            const t = parseServerTime(r.SubmitOrderDateTime);
             if(!isNaN(t) && t < sessionStarts.get(key)) return;
         }
         const name   = r.is_moved && r.moved_to ? String(r.moved_to)
@@ -890,6 +894,7 @@ async function setZone(zid){
 function setDot(s){ document.getElementById('statusDot').className='status-dot'+(s?' '+s:''); }
 let _loadController  = null;
 let _modalController = null;
+let _pollErrorCount  = 0;   // นับ error ต่อเนื่องเพื่อทำ backoff
 async function loadAll(){
     if(_loadController) _loadController.abort();
     _loadController = new AbortController();
@@ -920,10 +925,21 @@ async function loadAll(){
             const pending = state.active.filter(r=>!r.is_voided&&!r.is_moved&&!isHidden(r)&&!isNonKds(r)).length;
             document.title = pending > 0 ? `(${pending}) Staff Display` : 'Staff Display';
         }
+        _pollErrorCount = 0;
         renderGrid();
     } catch(e){
         if(e.name === 'AbortError') return;
+        _pollErrorCount++;
         setDot('error'); console.error(e);
+        // backoff: 1×→2×→4×→8×... สูงสุด 60 วิ ป้องกัน hammer server ที่กำลัง recover
+        const backoff = Math.min(REFRESH_MS * Math.pow(2, _pollErrorCount - 1), 60000);
+        if(_pollErrorCount > 1){
+            clearInterval(window._pollTimer);
+            window._pollTimer = setTimeout(() => {
+                window._pollTimer = setInterval(() => { if(!document.hidden) loadAll(); }, REFRESH_MS);
+                loadAll();
+            }, backoff);
+        }
     }
 }
 
@@ -961,17 +977,18 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden && win
 /* ── Auth ── */
 (function(){
     const LS_KEY = 'staff_display';
-    let _pollTimer = null;
-    window._isAuthed = false;
+    window._pollTimer   = null;
+    window._isAuthed    = false;
 
     function startPolling(){
         stopPolling();
+        _pollErrorCount = 0;
         loadAll();
         loadZones();
-        _pollTimer = setInterval(() => { if(!document.hidden) loadAll(); }, REFRESH_MS);
+        window._pollTimer = setInterval(() => { if(!document.hidden) loadAll(); }, REFRESH_MS);
     }
     function stopPolling(){
-        if(_pollTimer){ clearInterval(_pollTimer); _pollTimer = null; }
+        if(window._pollTimer){ clearInterval(window._pollTimer); window._pollTimer = null; }
     }
     function setStaff(id, name){
         window._isAuthed = true;
