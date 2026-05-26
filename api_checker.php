@@ -2,6 +2,28 @@
 ob_start();
 ini_set('display_errors', 0);
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
+
+// จับ uncaught exception ทุกชนิดก่อนที่ PHP จะ output HTML error
+set_exception_handler(function (Throwable $e) {
+    while (ob_get_level()) ob_end_clean();
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
+// จับ fatal error (out of memory, stack overflow, ฯลฯ) ที่ try/catch จับไม่ได้
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        while (ob_get_level()) ob_end_clean();
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'Server error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+});
+
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth_check.php';
 session_write_close();
