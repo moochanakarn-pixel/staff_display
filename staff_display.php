@@ -1017,9 +1017,10 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden && win
         showLogin();
     }
     async function doLogin(){
+        const btn = document.getElementById('loginBtn');
+        if(btn.disabled) return;                        // ป้องกัน double-submit
         const code = document.getElementById('loginCode').value.trim();
         if(!code) return;
-        const btn = document.getElementById('loginBtn');
         const err = document.getElementById('loginError');
         btn.disabled = true;
         err.textContent = '';
@@ -1042,7 +1043,7 @@ document.addEventListener('visibilitychange', () => { if(!document.hidden && win
     }
 
     document.getElementById('loginBtn').addEventListener('click', doLogin);
-    document.getElementById('loginCode').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+    document.getElementById('loginCode').addEventListener('keyup', e => { if(e.key==='Enter' && !e.isComposing) doLogin(); });
     document.getElementById('logoutBtn').addEventListener('click', () => {
         if(document.getElementById('logoutBtn').dataset.isGuest === '1'){
             showLogin();
