@@ -204,13 +204,17 @@ function writeUsageLog($event, array $context = [])
         @mkdir($logDir, 0755, true);
     }
 
-    // ลบไฟล์เก่ากว่า 7 วัน
-    $files = glob($logDir . DIRECTORY_SEPARATOR . 'usage-*.log') ?: [];
-    $cutoff = strtotime('-7 days');
-    foreach ($files as $file) {
-        if (@filemtime($file) < $cutoff) {
-            @unlink($file);
+    // ลบไฟล์เก่ากว่า 7 วัน — ทำแค่วันละครั้งเพื่อไม่ให้ glob() ทำงานทุก request
+    $cleanFlag = $logDir . DIRECTORY_SEPARATOR . '.last_cleanup';
+    if (@file_get_contents($cleanFlag) !== date('Y-m-d')) {
+        $files  = glob($logDir . DIRECTORY_SEPARATOR . 'usage-*.log') ?: [];
+        $cutoff = strtotime('-7 days');
+        foreach ($files as $file) {
+            if (@filemtime($file) < $cutoff) {
+                @unlink($file);
+            }
         }
+        @file_put_contents($cleanFlag, date('Y-m-d'), LOCK_EX);
     }
 
     $logFile = $logDir . DIRECTORY_SEPARATOR . 'usage-' . date('Y-m-d') . '.log';

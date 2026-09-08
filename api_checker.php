@@ -2,6 +2,28 @@
 ob_start();
 ini_set('display_errors', 0);
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
+
+// จับ uncaught exception ทุกชนิดก่อนที่ PHP จะ output HTML error
+set_exception_handler(function (Throwable $e) {
+    while (ob_get_level()) ob_end_clean();
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
+// จับ fatal error (out of memory, stack overflow, ฯลฯ) ที่ try/catch จับไม่ได้
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        while (ob_get_level()) ob_end_clean();
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'Server error'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+});
+
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth_check.php';
 session_write_close();
@@ -355,28 +377,61 @@ function fetchTableOrders($conn, $tableId, $transactionId = 0, $orderDate = '', 
         $sessionFilter = ' AND opf.SubmitOrderDateTime >= ?';
     }
 
+    // ตรวจประเภทของ table_id เพื่อเลือก WHERE ที่ถูกต้อง
+    // "12"        → numeric TableID  → WHERE opf.TableID = 12
+    // "sm6_t0"    → synthetic key    → WHERE opf.TableID = 0 AND opf.SaleModeID = 6
+    // "otf123"    → OTF TransactionID → WHERE odf.TransactionID = 123 (JOIN orderdetailfront)
+    // "LM111"     → DisplayTableName → WHERE opf.DisplayTableName = 'LM111'
+    $tableIdInt  = is_numeric($tableId) ? (int)$tableId : -1;
+    $saleModeId  = 0;
+    $otfTxId     = 0;
+    $displayName = '';
+    if ($tableIdInt > 0) {
+        $tableWhere   = 'opf.TableID = ?';
+        $tableType    = 'i';
+        $bindTableVal = $tableIdInt;
+    } elseif (preg_match('/^sm(\d+)_t0$/', $tableId, $m)) {
+        $saleModeId   = (int)$m[1];
+        $tableWhere   = 'opf.TableID = 0 AND opf.SaleModeID = ?';
+        $tableType    = 'i';
+        $bindTableVal = $saleModeId;
+    } elseif (preg_match('/^otf(\d+)$/', $tableId, $m)) {
+        $otfTxId      = (int)$m[1];
+        $tableWhere   = 'odf.TransactionID = ?';
+        $tableType    = 'i';
+        $bindTableVal = $otfTxId;
+        $join .= "\nINNER JOIN (SELECT ComputerID, OrderDetailID, MAX(TransactionID) AS TransactionID FROM orderdetailfront GROUP BY ComputerID, OrderDetailID) odf"
+               . "\n    ON odf.ComputerID = opf.ComputerID"
+               . "\n   AND odf.OrderDetailID = opf.OrderDetailID";
+    } else {
+        $displayName  = $tableId;
+        $tableWhere   = 'opf.DisplayTableName = ?';
+        $tableType    = 's';
+        $bindTableVal = $displayName;
+    }
+
     if ($transactionId > 0) {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.TransactionID = ? $order";
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE $tableWhere AND opf.TransactionID = ? $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
-        $stmt->bind_param('si', $tableId, $transactionId);
+        $stmt->bind_param($tableType . 'i', $bindTableVal, $transactionId);
     } elseif ($orderDate !== '') {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = ?$sessionFilter $order";
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE $tableWhere AND opf.OrderDate = ?$sessionFilter $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
         if ($sessionFilter !== '') {
-            $stmt->bind_param('sss', $tableId, $orderDate, $sessionStart);
+            $stmt->bind_param($tableType . 'ss', $bindTableVal, $orderDate, $sessionStart);
         } else {
-            $stmt->bind_param('ss', $tableId, $orderDate);
+            $stmt->bind_param($tableType . 's', $bindTableVal, $orderDate);
         }
     } else {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = CURDATE()$sessionFilter $order";
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE $tableWhere AND opf.OrderDate = CURDATE()$sessionFilter $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
         if ($sessionFilter !== '') {
-            $stmt->bind_param('ss', $tableId, $sessionStart);
+            $stmt->bind_param($tableType . 's', $bindTableVal, $sessionStart);
         } else {
-            $stmt->bind_param('s', $tableId);
+            $stmt->bind_param($tableType, $bindTableVal);
         }
     }
 
@@ -545,21 +600,45 @@ function fetchServeTableOrders($conn, $tableId, $transactionId = 0, $orderDate =
     $join  = "LEFT JOIN salemode sm ON sm.SaleModeID = opf.SaleModeID AND sm.Deleted = 0";
     $order = "ORDER BY opf.SubmitOrderDateTime ASC, opf.ProcessID ASC, opf.SubProcessID ASC";
 
-    if ($transactionId > 0) {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.TransactionID = ? $order";
-        $stmt = $conn->prepare($sql);
-        if (!$stmt) return array();
-        $stmt->bind_param('si', $tableId, $transactionId);
-    } elseif ($orderDate !== '') {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = ? $order";
-        $stmt = $conn->prepare($sql);
-        if (!$stmt) return array();
-        $stmt->bind_param('ss', $tableId, $orderDate);
+    // ตรวจประเภท table_id เหมือน fetchTableOrders
+    $tableIdInt  = is_numeric($tableId) ? (int)$tableId : -1;
+    $otfTxId     = 0;
+    if ($tableIdInt > 0) {
+        $tableWhere   = 'opf.TableID = ?';
+        $tableType    = 'i';
+        $bindTableVal = $tableIdInt;
+    } elseif (preg_match('/^sm(\d+)_t0$/', $tableId, $m)) {
+        $tableWhere   = 'opf.TableID = 0 AND opf.SaleModeID = ?';
+        $tableType    = 'i';
+        $bindTableVal = (int)$m[1];
+    } elseif (preg_match('/^otf(\d+)$/', $tableId, $m)) {
+        $otfTxId      = (int)$m[1];
+        $tableWhere   = 'odf.TransactionID = ?';
+        $tableType    = 'i';
+        $bindTableVal = $otfTxId;
+        $join .= "\nINNER JOIN (SELECT ComputerID, OrderDetailID, MAX(TransactionID) AS TransactionID FROM orderdetailfront GROUP BY ComputerID, OrderDetailID) odf"
+               . "\n    ON odf.ComputerID = opf.ComputerID AND odf.OrderDetailID = opf.OrderDetailID";
     } else {
-        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE opf.TableID = ? AND opf.OrderDate = CURDATE() $order";
+        $tableWhere   = 'opf.DisplayTableName = ?';
+        $tableType    = 's';
+        $bindTableVal = $tableId;
+    }
+
+    if ($transactionId > 0) {
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE $tableWhere AND opf.TransactionID = ? $order";
         $stmt = $conn->prepare($sql);
         if (!$stmt) return array();
-        $stmt->bind_param('s', $tableId);
+        $stmt->bind_param($tableType . 'i', $bindTableVal, $transactionId);
+    } elseif ($orderDate !== '') {
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE $tableWhere AND opf.OrderDate = ? $order";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return array();
+        $stmt->bind_param($tableType . 's', $bindTableVal, $orderDate);
+    } else {
+        $sql  = "SELECT $selectCols FROM orderprocessdetailfront opf $join WHERE $tableWhere AND opf.OrderDate = CURDATE() $order";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return array();
+        $stmt->bind_param($tableType, $bindTableVal);
     }
 
     $stmt->execute();
@@ -883,8 +962,8 @@ function fetchAllowedPrinterIds($conn, $computerId)
 
 function appendAllowedPrinterFilter(array &$where, array $allowedPrinterIds, $alias)
 {
+    // ถ้าไม่มี printer config สำหรับ computer นี้ = ไม่กรอง (แสดงทุก order)
     if (!$allowedPrinterIds) {
-        $where[] = '1 = 0';
         return;
     }
 
@@ -897,7 +976,6 @@ function appendAllowedPrinterFilter(array &$where, array $allowedPrinterIds, $al
     }
 
     if (!$safeIds) {
-        $where[] = '1 = 0';
         return;
     }
 
@@ -959,6 +1037,8 @@ function fetchActiveRows($conn)
             opf.IsMoveOrder,
             opf.SaleModeID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
+            COALESCE(odf.TransactionID, 0) AS OtfTransactionID,
+            COALESCE(otf.QueueName, '') AS QueueName,
             CASE
                 WHEN EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
@@ -980,6 +1060,15 @@ function fetchActiveRows($conn)
         LEFT JOIN salemode sm
             ON sm.SaleModeID = opf.SaleModeID
            AND sm.Deleted = 0
+        LEFT JOIN (
+            SELECT ComputerID, OrderDetailID, MAX(TransactionID) AS TransactionID
+            FROM orderdetailfront
+            GROUP BY ComputerID, OrderDetailID
+        ) odf
+            ON odf.ComputerID    = opf.ComputerID
+           AND odf.OrderDetailID = opf.OrderDetailID
+        LEFT JOIN ordertransactionfront otf
+            ON otf.TransactionID = odf.TransactionID
         WHERE " . implode(' AND ', $where) . "
         ORDER BY
             opf.SubmitOrderDateTime ASC,
@@ -1027,6 +1116,8 @@ function fetchFinishedRows($conn)
             opf.SaleModeID,
             opf.FinishStaffID,
             COALESCE(sm.SaleModeName, '-') AS SaleModeName,
+            COALESCE(odf.TransactionID, 0) AS OtfTransactionID,
+            COALESCE(otf.QueueName, '') AS QueueName,
             CASE
                 WHEN EXISTS(
                      SELECT 1 FROM ordertransactionfront otf2
@@ -1048,6 +1139,15 @@ function fetchFinishedRows($conn)
         LEFT JOIN salemode sm
             ON sm.SaleModeID = opf.SaleModeID
            AND sm.Deleted = 0
+        LEFT JOIN (
+            SELECT ComputerID, OrderDetailID, MAX(TransactionID) AS TransactionID
+            FROM orderdetailfront
+            GROUP BY ComputerID, OrderDetailID
+        ) odf
+            ON odf.ComputerID    = opf.ComputerID
+           AND odf.OrderDetailID = opf.OrderDetailID
+        LEFT JOIN ordertransactionfront otf
+            ON otf.TransactionID = odf.TransactionID
         WHERE " . implode(' AND ', $where) . "
         ORDER BY
             opf.FinishDateTime DESC,
@@ -1171,11 +1271,14 @@ function mergeChildProcessRowsIntoParents($rows)
             $newCard['OrderNo']             = $parentRow['OrderNo'];
             $newCard['SaleModeID']          = $parentRow['SaleModeID'];
             $newCard['SaleModeName']        = isset($parentRow['SaleModeName']) ? $parentRow['SaleModeName'] : '-';
+            $newCard['OtfTransactionID']    = isset($parentRow['OtfTransactionID']) ? $parentRow['OtfTransactionID'] : 0;
+            $newCard['QueueName']           = isset($parentRow['QueueName']) ? $parentRow['QueueName'] : '';
             $newCard['SubmitOrderDateTime'] = $parentRow['SubmitOrderDateTime'];
             // inherit flags พิเศษจาก parent
-            if (!empty($parentRow['is_voided']))   $newCard['is_voided']   = true;
-            if (!empty($parentRow['is_moved']))    { $newCard['is_moved']  = true;  $newCard['moved_to'] = $parentRow['moved_to']; }
-            if (!empty($parentRow['is_combined'])) $newCard['is_combined'] = true;
+            if (!empty($parentRow['is_voided']))      $newCard['is_voided']      = true;
+            if (!empty($parentRow['is_moved']))        { $newCard['is_moved']     = true; $newCard['moved_to'] = $parentRow['moved_to']; }
+            if (!empty($parentRow['is_combined']))     $newCard['is_combined']    = true;
+            if (!empty($parentRow['is_old_session']))  $newCard['is_old_session'] = true;
 
             $insertsByParent[$parentIndex][] = $newCard;
             $hiddenParents[$parentIndex]     = true;
