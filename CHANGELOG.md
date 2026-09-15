@@ -1,5 +1,96 @@
 # Changelog — Staff Display
 
+## [3.31.0] — 2026-09-15
+
+### แก้ไขบัค (Login Enter กด 2 ครั้งถึงเข้าได้)
+- **[LOGIN-ENTER]** เปลี่ยน `keydown` → `keyup` บน login input — `keydown` fires ก่อน input value ถูก commit จาก mobile/IME ทำให้ `input.value.trim()` อ่านได้ค่าไม่ครบหรือว่างเปล่าในครั้งแรก
+- **[LOGIN-COMPOSING]** เพิ่ม `!e.isComposing` guard — ป้องกัน Enter ส่ง form ขณะ IME ยังเลือกตัวอักษรอยู่
+- **[LOGIN-DOUBLE]** ย้าย `btn.disabled` check ขึ้นต้นฟังก์ชัน `doLogin()` — ป้องกัน double-submit เมื่อกด Enter เร็วสองครั้ง (เดิมตรวจหลังอ่านค่า input แล้ว)
+
+---
+
+## [3.30.0] — 2026-09-15
+
+### เพิ่มใหม่ (Global exception handler)
+- **[EXCEPTION-HANDLER]** เพิ่ม `set_exception_handler` + `register_shutdown_function` ที่ต้น `api_checker.php`
+  - Uncaught exception / PHP fatal error → return JSON `{"success":false,"error":"..."}` แทน HTML 500
+  - เพิ่ม `ob_start()` + `ini_set('display_errors', 0)` ป้องกัน error text รั่วออก response ก่อน handler ทำงาน
+  - ครอบคลุม `E_ERROR`, `E_PARSE`, `E_CORE_ERROR`, `E_COMPILE_ERROR`
+
+---
+
+## [3.29.0] — 2026-09-15
+
+### เพิ่มใหม่ (Poll backoff เมื่อ server error)
+- **[POLL-BACKOFF]** เพิ่ม exponential backoff เมื่อ poll ล้มเหลวต่อเนื่อง — 1×→2×→4×→8× REFRESH_MS สูงสุด 60 วินาที
+  - error ครั้งแรก: ยังคง interval ปกติ (ไม่ backoff) เพราะอาจเป็น glitch ชั่วคราว
+  - error ครั้งที่ 2+: หยุด interval เดิม สร้าง timeout แทนด้วย delay ที่คำนวณแล้ว
+  - สำเร็จอีกครั้ง: reset `_pollErrorCount = 0` กลับ interval ปกติทันที
+
+---
+
+## [3.28.0] — 2026-09-15
+
+### แก้ไขบัค (Timezone parsing Safari/Chrome)
+- **[TIMEZONE-PARSE]** เพิ่ม `parseServerTime()` — เติม `+07:00` suffix ให้ datetime string จาก MySQL ก่อน `new Date()`
+  - MySQL คืน `"2026-05-20 14:30:00"` (ไม่มี timezone) → Safari/Chrome บางรุ่น parse เป็น UTC → เวลาเร็วกว่าจริง 7 ชั่วโมง
+  - แก้ `waitMin()`, `cookMin()`, `fmtTime()` ทุกจุดให้ใช้ `parseServerTime()` แทน `new Date()` โดยตรง
+
+---
+
+## [3.27.0] — 2026-09-15
+
+### แก้ไขบัค (Set/Combo child cards)
+- **[SET-CHILD-KEY]** `mergeChildProcessRowsIntoParents` — child cards รับค่าจาก parent
+  - เพิ่ม `OtfTransactionID` และ `QueueName` จาก parent → delivery set items ได้ `tKey = 'otf{N}'` ถูกต้อง (เดิมได้ `sm{N}_t0`)
+  - เพิ่ม `is_old_session` จาก parent → set items ของ old session ถูกซ่อนพร้อม parent
+
+---
+
+## [3.26.0] — 2026-09-15
+
+### แก้ไขบัค (LEFT JOIN row multiplication)
+- **[JOIN-DEDUP]** `fetchActiveRows` / `fetchFinishedRows` — wrap `orderdetailfront` JOIN ด้วย GROUP BY subquery + `MAX(TransactionID)` ป้องกัน row multiplication เมื่อ (ComputerID, OrderDetailID) มีหลายแถว
+  ```sql
+  LEFT JOIN (
+      SELECT ComputerID, OrderDetailID, MAX(TransactionID) AS TransactionID
+      FROM orderdetailfront
+      GROUP BY ComputerID, OrderDetailID
+  ) odf ON odf.ComputerID = opf.ComputerID AND odf.OrderDetailID = opf.OrderDetailID
+  ```
+
+---
+
+## [3.25.0] — 2026-09-15
+
+### แก้ไขบัค (Delivery / TakeAway grouping)
+- **[OTF-KEY]** ใช้ `OtfTransactionID` + `QueueName` แยกแต่ละบิล delivery/TW แทน TableID=0
+  - `tKey()` JS: ตรวจ `TableID > 0` → `DisplayTableName` → `OtfTransactionID` → fallback `sm{N}_t0`
+  - `api_checker.php`: คืน `OtfTransactionID` (= `odf.TransactionID`) และ `QueueName` (จาก `ordertransactionfront`) ใน result set
+
+---
+
+## [3.24.0] — 2026-09-15
+
+### แก้ไขบัค (tKey priority + cross-SaleMode grouping)
+- **[TKEY-PRIORITY]** `tKey()` — เปลี่ยนลำดับตรวจเป็น TableID ก่อน DisplayTableName
+  - เดิม: ตรวจ DisplayTableName ก่อน → order ที่ย้ายโต๊ะ (TableID=4, DisplayTableName='2->4') ได้ key `'2->4'` แทน `'4'` → zone filter เสีย, การ์ดว่างซ้ำ
+  - ใหม่: `TableID > 0` → `DisplayTableName` → `OtfTransactionID` → `sm{N}_t0`
+- **[TKEY-SALEMODE]** fallback `sm{N}_t0` รวม SaleModeID — ป้องกัน order ต่าง SaleMode (เช่น TakeAway กับ Grab Food) ถูก group เดียวกันเมื่อทั้งคู่มี TableID=0 และไม่มี DisplayTableName
+
+---
+
+## [3.23.0] — 2026-09-15
+
+### แก้ไขบัค (fetchServeTableOrders cross-SaleMode + printer filter)
+- **[SERVE-KEY-TYPE]** `fetchServeTableOrders` — เพิ่ม key-type detection 4 branch เหมือน `fetchTableOrders`
+  - เดิม: ใช้ `WHERE opf.TableID = ?` เสมอ → key แบบ `DisplayTableName` / `otf{N}` / `sm{N}_t0` หา order ไม่เจอ → modal ว่างเปล่า
+  - ใหม่: ตรวจ key รูปแบบ: ตัวเลข → `TableID`, `sm{N}_t0` → `TableID=0 AND SaleModeID`, `otf{N}` → `odf.TransactionID`, อื่นๆ → `DisplayTableName`
+- **[PRINTER-FILTER]** `appendAllowedPrinterFilter` — empty list = ไม่กรอง (แสดงทุก order)
+  - เดิม: empty list เพิ่ม `1=0` ใน WHERE → KDS แสดงว่างเปล่าทั้งหมดเมื่อ printer config ยังไม่ตั้งค่า
+
+---
+
 ## [3.22.0] — 2026-05-21
 
 ### ลบ dead code ออก
